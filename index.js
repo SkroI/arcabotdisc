@@ -101,7 +101,7 @@ client.on('interactionCreate', async interaction => {
 // --- Ready event ---
 client.once('ready', async () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
-  client.user.setActivity('Pixel Tests', { type: ActivityType.Playing });
+  client.user.setActivity('Arcabloom Services', { type: ActivityType.Playing });
 });
 
 // --- Login ---
