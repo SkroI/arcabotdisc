@@ -125,7 +125,7 @@ client.on('interactionCreate', async interaction => {
 // --- Ready event ---
 client.once('ready', async () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
-  client.user.setActivity('Taco Battles 🌮', { type: ActivityType.Playing });
+  client.user.setActivity('Pixel Tests', { type: ActivityType.Playing });
 
   // Post leaderboard message once
   await sendLeaderboardOnce(client);
