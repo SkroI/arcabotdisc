@@ -13,6 +13,7 @@
     "axios": "^1.4.0",
     "moment-timezone": "^0.5.43",
     "noblox.js": "^4.13.1",
-    "node-fetch": "^3.2.6"
+    "node-fetch": "^3.2.6",
+    "dotenv": "^16.4.5"
   }
 }
