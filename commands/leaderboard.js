@@ -4,7 +4,7 @@ import fetch from 'node-fetch';
 const allowed = ['837537455212986378', '842777765246009414'];
 
 export const data = new SlashCommandBuilder()
-  .setName('roblox')
+  .setName('leaderboard')
   .setDescription('View the  leaderboard');
 
 export { allowed };
