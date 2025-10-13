@@ -1,13 +1,12 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import fetch from 'node-fetch';
 
-// 🧩 Add allowed role IDs here (you can easily add more later)
+// 🧩 Add allowed role IDs here
 const allowedRoles = [
   '1427338616580870247', // Admin role
-  // '1427338616580870247', // Example: add more roles here
+  // '123456789012345678', // Add more roles here
 ];
 
-// Simple in-memory cache for Roblox usernames
 const usernameCache = {};
 
 async function getUsername(userId) {
@@ -26,8 +25,7 @@ async function getUsername(userId) {
 export const data = new SlashCommandBuilder()
   .setName('leaderboard')
   .setDescription('View the leaderboard')
-  // 👇 Disable for everyone by default (you'll manually enable for allowed roles in Discord)
-  .setDefaultMemberPermissions(0)
+  // 👇 leave this visible to everyone
   .setDMPermission(false);
 
 export async function execute(interaction) {
@@ -75,7 +73,6 @@ export async function execute(interaction) {
       });
     }
 
-    // Build leaderboard
     const leaderboardLines = await Promise.all(
       data.entries.map(async (entry, index) => {
         const username = await getUsername(entry.id);
