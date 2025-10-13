@@ -6,9 +6,6 @@ import { config } from 'dotenv';
 import express from 'express';
 import { editLeaderboardMessage } from './commands/leaderboardPoster.js';
 
-
-
-
 config(); // Load .env
 
 const token = process.env.TOKEN;
@@ -63,15 +60,13 @@ try {
   console.error('❌ Error registering commands:', err);
 }
 
-// --- Express server to keep Render service alive ---
+// --- Express server (keep-alive + leaderboard update) ---
 const app = express();
 const PORT = process.env.PORT || 3000;
-
 
 app.get('/', async (_req, res) => {
   try {
     await editLeaderboardMessage(client);
-
     res.send(`
       <h1>🌮 Taco Bot is Online!</h1>
       <p><strong>Bot:</strong> ${client.user?.tag ?? 'Starting...'}</p>
@@ -90,38 +85,10 @@ app.listen(PORT, () => {
 // --- Discord interaction handling ---
 client.on('interactionCreate', async interaction => {
   try {
-    // Slash commands
     if (interaction.isCommand()) {
       const command = client.commands.get(interaction.commandName);
       if (!command) return;
-      // Pass client to duel command
-      if (interaction.commandName === 'duel') {
-        await command.execute(interaction, client);
-      } else {
-        await command.execute(interaction);
-      }
-    }
-
-    // Select menu
-    else if (interaction.isStringSelectMenu()) {
-      if (interaction.customId === 'battle_selectTaco') {
-        const battleModule = await import('./commands/battle.js');
-        return battleModule.handleSelect(interaction);
-      } else if (interaction.customId.startsWith('duel_select_')) {
-        const duelModule = await import('./commands/duel.js');
-        return duelModule.handleSelect(interaction);
-      }
-    }
-
-    // Buttons
-    else if (interaction.isButton()) {
-      if (interaction.customId.startsWith('battle_')) {
-        const battleModule = await import('./commands/battle.js');
-        return battleModule.handleButton(interaction);
-      } else if (interaction.customId.startsWith('duel_')) {
-        const duelModule = await import('./commands/duel.js');
-        return duelModule.handleFightButton(interaction);
-      }
+      await command.execute(interaction);
     }
   } catch (err) {
     console.error('❌ Interaction error:', err);
@@ -136,5 +103,6 @@ client.once('ready', async () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
   client.user.setActivity('Pixel Tests', { type: ActivityType.Playing });
 });
+
 // --- Login ---
 client.login(token);
