@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import { config } from 'dotenv';
 import express from 'express';
 
-config(); // Load .env file
+config(); // Load .env
 
 const token = process.env.TOKEN;
 const clientId = process.env.ID;
@@ -22,7 +22,7 @@ const __dirname = path.dirname(__filename);
 
 // --- Discord client setup ---
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.DirectMessages]
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.DirectMessages],
 });
 
 client.commands = new Collection();
@@ -59,25 +59,24 @@ try {
   console.error('❌ Error registering commands:', err);
 }
 
-// --- Express server for /runup (Replit uptime endpoint) ---
+// --- Express server to keep Render service alive ---
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.get('/runup', (_req, res) => {
+app.get('/', (_req, res) => {
   res.send(`
     <h1>🌮 Taco Bot is Online!</h1>
     <p><strong>Bot:</strong> ${client.user?.tag ?? 'Starting...'}</p>
     <p><strong>Active Commands:</strong> ${client.commands.size}</p>
-    <p>Status: ✅ Running smoothly on Replit</p>
+    <p>Status: ✅ Running smoothly on Render</p>
   `);
 });
 
 app.listen(PORT, () => {
-  console.log(`🌐 Express server ready on https://arcabotdisc.replit.app:${PORT}/runup`);
+  console.log(`🌐 Express server running on port ${PORT}`);
 });
 
 // --- Discord interaction handling ---
-// --- Interaction handling ---
 client.on('interactionCreate', async interaction => {
   try {
     // Slash commands
@@ -120,7 +119,6 @@ client.on('interactionCreate', async interaction => {
     }
   }
 });
-
 
 // --- Ready event ---
 client.once('ready', () => {
