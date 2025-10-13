@@ -2,9 +2,9 @@ import { EmbedBuilder } from 'discord.js';
 import fetch from 'node-fetch';
 
 const CHANNEL_ID = '1427324210832740415';
-let leaderboardMessageId = null; // store message ID to edit later
-
+const MESSAGE_ID = '1427327245386780714'; // the leaderboard message
 const usernameCache = {};
+
 async function getUsername(userId) {
   if (usernameCache[userId]) return usernameCache[userId];
   try {
@@ -18,7 +18,6 @@ async function getUsername(userId) {
   }
 }
 
-// Function to fetch leaderboard and return Embed
 export async function fetchLeaderboardEmbed() {
   const universeId = process.env.ROBLOX_UNIVERSE_ID;
   const dataStore = process.env.ROBLOX_LEADERSTAT_KEY;
@@ -62,18 +61,18 @@ export async function fetchLeaderboardEmbed() {
   }
 }
 
-// Function to send the leaderboard once
-export async function sendLeaderboardOnce(client) {
-  if (leaderboardMessageId) return; // already sent
+// Edit the existing message
+export async function editLeaderboardMessage(client) {
+  try {
+    const embed = await fetchLeaderboardEmbed();
+    if (!embed) return;
 
-  const channel = await client.channels.fetch(CHANNEL_ID);
-  const embed = await fetchLeaderboardEmbed();
-  if (!embed) return;
+    const channel = await client.channels.fetch(CHANNEL_ID);
+    const message = await channel.messages.fetch(MESSAGE_ID);
 
-  const msg = await channel.send({ embeds: [embed] });
-  leaderboardMessageId = msg.id;
-  console.log(`✅ Leaderboard posted: ${leaderboardMessageId}`);
+    await message.edit({ embeds: [embed] });
+    console.log(`✅ Leaderboard message updated`);
+  } catch (err) {
+    console.error('❌ Failed to edit leaderboard message:', err);
+  }
 }
-
-// Export the message ID and channel so it can be edited later
-export { leaderboardMessageId, CHANNEL_ID };
