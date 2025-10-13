@@ -68,7 +68,6 @@ app.get('/', (_req, res) => {
     <h1>🌮 Taco Bot is Online!</h1>
     <p><strong>Bot:</strong> ${client.user?.tag ?? 'Starting...'}</p>
     <p><strong>Active Commands:</strong> ${client.commands.size}</p>
-    <p>Status: ✅ Running smoothly on Render</p>
   `);
 });
 
