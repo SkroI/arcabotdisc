@@ -4,7 +4,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { config } from 'dotenv';
 import express from 'express';
-import { sendLeaderboardOnce } from './commands/leaderboardPoster.js';
+import { editLeaderboardMessage } from './commands/leaderboardPoster.js';
+
 
 
 
@@ -66,12 +67,20 @@ try {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.get('/', (_req, res) => {
-  res.send(`
-    <h1>🌮 Taco Bot is Online!</h1>
-    <p><strong>Bot:</strong> ${client.user?.tag ?? 'Starting...'}</p>
-    <p><strong>Active Commands:</strong> ${client.commands.size}</p>
-  `);
+
+app.get('/', async (_req, res) => {
+  try {
+    await editLeaderboardMessage(client);
+
+    res.send(`
+      <h1>🌮 Taco Bot is Online!</h1>
+      <p><strong>Bot:</strong> ${client.user?.tag ?? 'Starting...'}</p>
+      <p><strong>Leaderboard updated!</strong></p>
+    `);
+  } catch (err) {
+    console.error('❌ Error updating leaderboard via Express route:', err);
+    res.status(500).send('❌ Failed to update leaderboard.');
+  }
 });
 
 app.listen(PORT, () => {
@@ -126,9 +135,6 @@ client.on('interactionCreate', async interaction => {
 client.once('ready', async () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
   client.user.setActivity('Pixel Tests', { type: ActivityType.Playing });
-
-  // Post leaderboard message once
-  await sendLeaderboardOnce(client);
 });
 // --- Login ---
 client.login(token);
