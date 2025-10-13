@@ -1,16 +1,15 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import fetch from 'node-fetch';
 
-const allowed = ['837537455212986378', '842777765246009414'];
+// 🧩 Add allowed role IDs here (you can easily add more later)
+const allowedRoles = [
+  '1427338616580870247', // Admin role
+  // '1427338616580870247', // Example: add more roles here
+];
 
-export const data = new SlashCommandBuilder()
-  .setName('leaderboard')
-  .setDescription('View the  leaderboard');
+// Simple in-memory cache for Roblox usernames
+const usernameCache = {};
 
-export { allowed };
-
-// Helper to get Roblox username from user ID
-const usernameCache = {}; // simple in-memory cache
 async function getUsername(userId) {
   if (usernameCache[userId]) return usernameCache[userId];
   try {
@@ -24,11 +23,23 @@ async function getUsername(userId) {
   }
 }
 
+export const data = new SlashCommandBuilder()
+  .setName('leaderboard')
+  .setDescription('View the leaderboard')
+  // 👇 Disable for everyone by default (you'll manually enable for allowed roles in Discord)
+  .setDefaultMemberPermissions(0)
+  .setDMPermission(false);
+
 export async function execute(interaction) {
-  if (allowed.length > 0 && !allowed.includes(interaction.user.id)) {
+  // ✅ Check if user has any of the allowed roles
+  const hasAccess = allowedRoles.some(roleId =>
+    interaction.member.roles.cache.has(roleId)
+  );
+
+  if (!hasAccess) {
     return interaction.reply({
-      content: '❌ cant use the cmd',
-      ephemeral: true
+      content: '🚫 You do not have permission to use this command.',
+      ephemeral: true,
     });
   }
 
@@ -39,48 +50,52 @@ export async function execute(interaction) {
 
   if (!process.env.ROBLOX_API_KEY || !universeId || !dataStore) {
     return interaction.reply({
-      content: '❌ Error, contact pixel',
-      ephemeral: true
+      content: '❌ Missing Roblox configuration. Please contact Pixel.',
+      ephemeral: true,
     });
   }
 
   try {
     const url = `https://apis.roblox.com/ordered-data-stores/v1/universes/${universeId}/orderedDataStores/${dataStore}/scopes/${scope}/entries?max_page_size=${limit}&order_by=desc`;
+
     const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': process.env.ROBLOX_API_KEY
-      }
+        'x-api-key': process.env.ROBLOX_API_KEY,
+      },
     });
 
     if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
     const data = await response.json();
 
     if (!data.entries || data.entries.length === 0) {
-      return interaction.reply({ content: 'No leaderboard data found.', ephemeral: true });
+      return interaction.reply({
+        content: '📭 No leaderboard data found.',
+        ephemeral: true,
+      });
     }
 
-    // Build leaderboard lines
+    // Build leaderboard
     const leaderboardLines = await Promise.all(
       data.entries.map(async (entry, index) => {
         const username = await getUsername(entry.id);
-        return `#${index + 1} **${username}** - **${entry.value} Coins**`;
+        return `#${index + 1} **${username}** — **${entry.value} Coins**`;
       })
     );
 
     const embed = new EmbedBuilder()
-      .setTitle('🪙  Coins leaderboard')
+      .setTitle('🪙 Coin Leaderboard')
       .setDescription(leaderboardLines.join('\n'))
       .setColor(0xFFD700)
-      .setThumbnail('https://tr.rbxcdn.com/1e1c7f41bb5f41c0d87a2a4f1d8898d2/420/420/Image/Png') // optional leaderboard icon
+      .setThumbnail('https://tr.rbxcdn.com/1e1c7f41bb5f41c0d87a2a4f1d8898d2/420/420/Image/Png')
       .setTimestamp();
 
-    await interaction.reply({ embeds: [embed], ephemeral: false });
+    await interaction.reply({ embeds: [embed] });
   } catch (err) {
-    console.error(err);
+    console.error('❌ Leaderboard fetch error:', err);
     await interaction.reply({
-      content: `❌ Failed to fetch leaderboard`,
-      ephemeral: true
+      content: '❌ Failed to fetch leaderboard. Please try again later.',
+      ephemeral: true,
     });
   }
 }
