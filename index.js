@@ -4,6 +4,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { config } from 'dotenv';
 import express from 'express';
+import { sendLeaderboardOnce } from './commands/leaderboardPoster.js';
+
+
 
 config(); // Load .env
 
@@ -120,10 +123,12 @@ client.on('interactionCreate', async interaction => {
 });
 
 // --- Ready event ---
-client.once('ready', () => {
+client.once('ready', async () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
   client.user.setActivity('Taco Battles 🌮', { type: ActivityType.Playing });
-});
 
+  // Post leaderboard message once
+  await sendLeaderboardOnce(client);
+});
 // --- Login ---
 client.login(token);
