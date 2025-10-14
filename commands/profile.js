@@ -7,14 +7,16 @@ export const data = new SlashCommandBuilder()
 
 export const allowed = [];
 const namecache = {};
+const usernameCache = {};
 
 const BLOXLINK_KEY = process.env.BLOXLINK_KEY;
 const ROBLOX_API_KEY = process.env.ROBLOX_API_KEY;
 const GUILD_ID = process.env.GUILD_ID;
 const UNIVERSE_ID = process.env.ROBLOX_UNIVERSE_ID;
-const DATASTORE = 'Coins'; 
+const DATASTORE = process.env.ROBLOX_LEADERSTAT_KEY; // same as leaderboard
 const SCOPE = 'global';
-// Fetch Roblox ID from Discord ID via Blox.link
+
+// Fetch Roblox ID from Discord via Blox.link
 async function getRobloxId(discordId) {
   if (namecache[discordId]) return namecache[discordId];
 
@@ -24,7 +26,7 @@ async function getRobloxId(discordId) {
       { headers: { Authorization: BLOXLINK_KEY } }
     );
 
-    if (res.status === 404) return null; // Not linked
+    if (res.status === 404) return null;
     if (!res.ok) return null;
 
     const data = await res.json();
@@ -38,52 +40,46 @@ async function getRobloxId(discordId) {
   }
 }
 
+// Fetch coins using the working leaderboard approach
 async function getCoins(robloxId) {
   if (!robloxId) return 0;
 
-  let cursor = null;
   try {
-    do {
-      const url = new URL(
-        `https://apis.roblox.com/ordered-data-stores/v1/universes/${UNIVERSE_ID}/orderedDataStores/${DATASTORE}/scopes/${SCOPE}/entries`
-      );
-      url.searchParams.set('max_page_size', 100);
-      url.searchParams.set('order_by', 'desc');
-      if (cursor) url.searchParams.set('cursor', cursor);
+    const url = `https://apis.roblox.com/ordered-data-stores/v1/universes/${UNIVERSE_ID}/orderedDataStores/${DATASTORE}/scopes/${SCOPE}/entries?max_page_size=100&order_by=desc`;
+    const response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ROBLOX_API_KEY,
+      },
+    });
 
-      const response = await fetch(url.toString(), {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': ROBLOX_API_KEY,
-        },
-      });
+    if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+    const data = await response.json();
 
-      if (!response.ok) {
-        console.error(`Roblox API returned status ${response.status}`);
-        return 0;
-      }
+    if (!data.entries || data.entries.length === 0) return 0;
 
-      const data = await response.json();
-
-      if (!data.entries || !Array.isArray(data.entries)) {
-        console.warn('Roblox API response has no entries:', data);
-        return 0;
-      }
-
-      const entry = data.entries.find(e => e.id === robloxId);
-      if (entry) return entry.value;
-
-      cursor = data.nextPageCursor || null;
-    } while (cursor);
-
-    return 0; // Not found after checking all pages
+    const playerEntry = data.entries.find(entry => entry.id === robloxId);
+    return playerEntry ? playerEntry.value : 0;
   } catch (err) {
     console.error('Error fetching coins:', err);
     return 0;
   }
 }
 
-// Command execution
+// Optional: fetch Roblox username for embed
+async function getUsername(userId) {
+  if (usernameCache[userId]) return usernameCache[userId];
+  try {
+    const res = await fetch(`https://users.roblox.com/v1/users/${userId}`);
+    if (!res.ok) return userId;
+    const data = await res.json();
+    usernameCache[userId] = data.name || userId;
+    return usernameCache[userId];
+  } catch {
+    return userId;
+  }
+}
+
 export async function execute(interaction) {
   const robloxId = await getRobloxId(interaction.user.id);
 
@@ -95,13 +91,14 @@ export async function execute(interaction) {
   }
 
   const coins = await getCoins(robloxId);
+  const username = await getUsername(robloxId);
 
   const embed = new EmbedBuilder()
     .setTitle('🍓 〉 Arcabloom Profile')
     .setDescription('Here is your profile information!')
     .addFields(
       { name: '🪙 Coins', value: `${coins}` },
-      { name: '🤖 Roblox ID', value: robloxId.toString() }
+      { name: '🤖 Roblox Username', value: username }
     )
     .setColor(0xFFD700)
     .setFooter({ text: 'Arcabloom Services ©️ 2025' })
@@ -109,5 +106,3 @@ export async function execute(interaction) {
 
   await interaction.reply({ embeds: [embed], ephemeral: true });
 }
-
-
