@@ -13,7 +13,7 @@ const ROBLOX_API_KEY = process.env.ROBLOX_API_KEY;
 const GUILD_ID = process.env.GUILD_ID;
 const UNIVERSE_ID = process.env.ROBLOX_UNIVERSE_ID;
 const DATASTORE = 'Coins'; 
-
+const SCOPE = 'global';
 // Fetch Roblox ID from Discord ID via Blox.link
 async function getRobloxId(discordId) {
   if (namecache[discordId]) return namecache[discordId];
@@ -44,7 +44,9 @@ async function getCoins(robloxId) {
   let cursor = null;
   try {
     do {
-      const url = new URL(`https://apis.roblox.com/ordered-data-stores/v1/universes/${UNIVERSE_ID}/orderedDataStores/${DATASTORE}/scopes/global/entries`);
+      const url = new URL(
+        `https://apis.roblox.com/ordered-data-stores/v1/universes/${UNIVERSE_ID}/orderedDataStores/${DATASTORE}/scopes/${SCOPE}/entries`
+      );
       url.searchParams.set('max_page_size', 100);
       url.searchParams.set('order_by', 'desc');
       if (cursor) url.searchParams.set('cursor', cursor);
@@ -56,8 +58,17 @@ async function getCoins(robloxId) {
         },
       });
 
-      if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+      if (!response.ok) {
+        console.error(`Roblox API returned status ${response.status}`);
+        return 0;
+      }
+
       const data = await response.json();
+
+      if (!data.entries || !Array.isArray(data.entries)) {
+        console.warn('Roblox API response has no entries:', data);
+        return 0;
+      }
 
       const entry = data.entries.find(e => e.id === robloxId);
       if (entry) return entry.value;
@@ -65,7 +76,7 @@ async function getCoins(robloxId) {
       cursor = data.nextPageCursor || null;
     } while (cursor);
 
-    return 0; 
+    return 0; // Not found after checking all pages
   } catch (err) {
     console.error('Error fetching coins:', err);
     return 0;
@@ -98,4 +109,5 @@ export async function execute(interaction) {
 
   await interaction.reply({ embeds: [embed], ephemeral: true });
 }
+
 
