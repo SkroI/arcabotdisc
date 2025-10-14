@@ -14,6 +14,7 @@ const universeId = process.env.ROBLOX_UNIVERSE_ID;
 const dataStore = process.env.ROBLOX_LEADERSTAT_KEY;
 const scope = 'global';
 
+// Fetch Roblox username from userId
 async function getUsername(userId) {
   if (usernameCache[userId]) return usernameCache[userId];
   try {
@@ -27,12 +28,12 @@ async function getUsername(userId) {
   }
 }
 
+// Fetch Roblox ID or name via Bloxlink
 async function getRobloxName(discordId, status) {
   if (nameCache[discordId]) return nameCache[discordId];
 
   try {
     const guildId = process.env.GUILD_ID;
-
     const res = await fetch(
       `https://api.blox.link/v4/public/guilds/${guildId}/discord-to-roblox/${discordId}`,
       { headers: { Authorization: key } }
@@ -60,6 +61,7 @@ async function getRobloxName(discordId, status) {
   }
 }
 
+// Fetch user coins from leaderboard-style ordered DataStore
 async function getUserCoins(userId) {
   if (!process.env.ROBLOX_API_KEY || !universeId || !dataStore) {
     console.error('❌ Missing Roblox config (API key, universe ID, datastore)');
@@ -77,28 +79,25 @@ async function getUserCoins(userId) {
 
     if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
     const data = await response.json();
-
     if (!data.entries || data.entries.length === 0) return null;
 
-    // Corrected: use 'id' instead of 'userId'
     const userEntry = data.entries.find(entry => entry.id.toString() === userId.toString());
-    if (!userEntry) return null;
-
-    return userEntry.value ?? null;
+    return userEntry ? userEntry.value ?? null : null;
   } catch (err) {
     console.error(`❌ Error fetching coins for user ${userId}:`, err);
     return null;
   }
 }
 
+// Main command execution
 export async function execute(interaction) {
-  await interaction.deferReply({ ephemeral: true }); // defer immediately
+  await interaction.deferReply({ ephemeral: true });
 
   try {
     const robloxName = await getRobloxName(interaction.user.id);
     const robloxId = await getRobloxName(interaction.user.id, 'USERID');
-    let coins = null;
 
+    let coins = null;
     if (robloxId && robloxId !== 'Not linked' && !isNaN(robloxId)) {
       coins = await getUserCoins(robloxId);
     }
