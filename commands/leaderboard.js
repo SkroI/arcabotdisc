@@ -1,61 +1,75 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import fetch from 'node-fetch';
 
-// 🧩 Add allowed role IDs here
-const allowedRoles = [
-  '1427338616580870247', // Admin role
-  // '123456789012345678', // Add more roles here
-];
+export const data = new SlashCommandBuilder()
+  .setName('profile')
+  .setDescription('Load your in-game profile!');
+
+export const allowed = [];
 
 const usernameCache = {};
+const nameCache = {};
+const key = process.env.BLOXLINK_KEY;
+const universeId = process.env.ROBLOX_UNIVERSE_ID;
+const dataStore = process.env.ROBLOX_LEADERSTAT_KEY;
+const scope = 'global';
 
+// Fetch Roblox username from userId
 async function getUsername(userId) {
   if (usernameCache[userId]) return usernameCache[userId];
   try {
     const res = await fetch(`https://users.roblox.com/v1/users/${userId}`);
-    if (!res.ok) return userId;
+    if (!res.ok) return userId.toString();
     const data = await res.json();
-    usernameCache[userId] = data.name || userId;
+    usernameCache[userId] = data.name || userId.toString();
     return usernameCache[userId];
   } catch {
-    return userId;
+    return userId.toString();
   }
 }
 
-export const data = new SlashCommandBuilder()
-  .setName('leaderboard')
-  .setDescription('View the leaderboard')
-  // 👇 leave this visible to everyone
-  .setDMPermission(false);
+// Fetch Roblox ID or name via Bloxlink
+async function getRobloxName(discordId, status) {
+  if (nameCache[discordId]) return nameCache[discordId];
 
-export async function execute(interaction) {
-  // ✅ Check if user has any of the allowed roles
-  const hasAccess = allowedRoles.some(roleId =>
-    interaction.member.roles.cache.has(roleId)
-  );
+  try {
+    const guildId = process.env.GUILD_ID;
+    const res = await fetch(
+      `https://api.blox.link/v4/public/guilds/${guildId}/discord-to-roblox/${discordId}`,
+      { headers: { Authorization: key } }
+    );
 
-  if (!hasAccess) {
-    return interaction.reply({
-      content: '🚫 You do not have permission to use this command.',
-      ephemeral: true,
-    });
+    if (res.status === 404) return 'Not linked';
+    if (!res.ok) return 'API error';
+
+    const data = await res.json();
+    const robloxId = data.robloxID;
+    if (!robloxId) return 'Not linked';
+
+    let result;
+    if (status === 'USERID') {
+      result = robloxId.toString();
+    } else {
+      result = await getUsername(robloxId);
+    }
+
+    nameCache[discordId] = result;
+    return result;
+  } catch (err) {
+    console.error('❌ Error fetching Roblox name:', err);
+    return 'Error fetching name';
   }
+}
 
-  const universeId = process.env.ROBLOX_UNIVERSE_ID;
-  const dataStore = process.env.ROBLOX_LEADERSTAT_KEY;
-  const scope = 'global';
-  const limit = 10;
-
+// Fetch user coins from leaderboard-style ordered DataStore
+async function getUserCoins(userId) {
   if (!process.env.ROBLOX_API_KEY || !universeId || !dataStore) {
-    return interaction.reply({
-      content: '❌ Missing Roblox configuration. Please contact Pixel.',
-      ephemeral: true,
-    });
+    console.error('❌ Missing Roblox config (API key, universe ID, datastore)');
+    return null;
   }
 
   try {
-    const url = `https://apis.roblox.com/ordered-data-stores/v1/universes/${universeId}/orderedDataStores/${dataStore}/scopes/${scope}/entries?max_page_size=${limit}&order_by=desc`;
-
+    const url = `https://apis.roblox.com/ordered-data-stores/v1/universes/${universeId}/orderedDataStores/${dataStore}/scopes/global/entries?max_page_size=100&order_by=desc`;
     const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
@@ -65,34 +79,45 @@ export async function execute(interaction) {
 
     if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
     const data = await response.json();
+    if (!data.entries || data.entries.length === 0) return null;
 
-    if (!data.entries || data.entries.length === 0) {
-      return interaction.reply({
-        content: '📭 No leaderboard data found.',
-        ephemeral: true,
-      });
+    const userEntry = data.entries.find(entry => entry.id.toString() === userId.toString());
+    return userEntry ? userEntry.value ?? null : null;
+  } catch (err) {
+    console.error(`❌ Error fetching coins for user ${userId}:`, err);
+    return null;
+  }
+}
+
+// Main command execution
+export async function execute(interaction) {
+  await interaction.deferReply({ ephemeral: true });
+
+  try {
+    const robloxName = await getRobloxName(interaction.user.id);
+    const robloxId = await getRobloxName(interaction.user.id, 'USERID');
+
+    let coins = null;
+    if (robloxId && robloxId !== 'Not linked' && !isNaN(robloxId)) {
+      coins = await getUserCoins(robloxId);
     }
 
-    const leaderboardLines = await Promise.all(
-      data.entries.map(async (entry, index) => {
-        const username = await getUsername(entry.id);
-        return `#${index + 1} **${username}** — **${entry.value} Coins**`;
-      })
-    );
-
     const embed = new EmbedBuilder()
-      .setTitle('🪙 Coin Leaderboard')
-      .setDescription(leaderboardLines.join('\n'))
+      .setTitle('🍓 〉 Arcabloom Profile')
+      .setDescription(`Your in-game stats, ${interaction.user.username}!`)
+      .addFields(
+        { name: 'Roblox Username', value: robloxName, inline: true },
+        { name: '🪙 Coins', value: coins !== null ? coins.toString() : 'No data found', inline: true },
+      )
       .setColor(0xFFD700)
-      .setThumbnail('https://tr.rbxcdn.com/1e1c7f41bb5f41c0d87a2a4f1d8898d2/420/420/Image/Png')
+      .setFooter({ text: 'Arcabloom Services ©️ 2025' })
       .setTimestamp();
 
-    await interaction.reply({ embeds: [embed] });
+    await interaction.editReply({ embeds: [embed] });
   } catch (err) {
-    console.error('❌ Leaderboard fetch error:', err);
-    await interaction.reply({
-      content: '❌ Failed to fetch leaderboard. Please try again later.',
-      ephemeral: true,
-    });
+    console.error('❌ Profile command error:', err);
+    try {
+      await interaction.editReply({ content: '⚠️ Something went wrong while fetching your profile.' });
+    } catch {}
   }
 }
