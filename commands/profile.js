@@ -2,7 +2,7 @@ import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import fetch from 'node-fetch';
 
 export const data = new SlashCommandBuilder()
-  .setName('help')
+  .setName('profile')
   .setDescription('Get your Arcabloom profile info.');
 
 export const allowed = [];
@@ -98,3 +98,4 @@ export async function execute(interaction) {
 
   await interaction.reply({ embeds: [embed], ephemeral: true });
 }
+
