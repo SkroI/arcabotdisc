@@ -67,21 +67,30 @@ async function getUserCoins(userId) {
   }
 
   try {
-    const url = `https://apis.roblox.com/ordered-data-stores/v1/universes/${universeId}/orderedDataStores/${dataStore}/scopes/${scope}/entries/${userId}`;
+    const url = `https://apis.roblox.com/ordered-data-stores/v1/universes/${universeId}/orderedDataStores/${dataStore}/scopes/global/entries?max_page_size=100&order_by=desc`;
     const response = await fetch(url, {
-      headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ROBLOX_API_KEY },
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ROBLOX_API_KEY 
+      },
     });
 
-    if (response.status === 404) return null;
     if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-
     const data = await response.json();
-    return data.value ?? null;
+
+    if (!data.entries || data.entries.length === 0) return null;
+
+    // Look for the entry with matching userId
+    const userEntry = data.entries.find(entry => entry.userId.toString() === userId.toString());
+    if (!userEntry) return null;
+
+    return userEntry.value ?? null;
   } catch (err) {
     console.error(`❌ Error fetching coins for user ${userId}:`, err);
     return null;
   }
 }
+
 
 export async function execute(interaction) {
   await interaction.deferReply({ ephemeral: true }); // defer immediately
@@ -109,3 +118,4 @@ export async function execute(interaction) {
     } catch {}
   }
 }
+
