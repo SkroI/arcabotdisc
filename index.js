@@ -22,10 +22,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // --- Discord client setup ---
-const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.DirectMessages],
-});
-
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.DirectMessages] });
 client.commands = new Collection();
 
 // --- Load commands dynamically ---
@@ -60,7 +57,7 @@ try {
   console.error('❌ Error registering commands:', err);
 }
 
-// --- Express server (keep-alive + leaderboard update) ---
+// --- Express server ---
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -68,7 +65,7 @@ app.get('/', async (_req, res) => {
   try {
     await editLeaderboardMessage(client);
     res.send(`
-      <h1>🌮 Taco Bot is Online!</h1>
+      <h1>🍓 Arcabloom Services are online!</h1>
       <p><strong>Bot:</strong> ${client.user?.tag ?? 'Starting...'}</p>
       <p><strong>Leaderboard updated!</strong></p>
     `);
@@ -78,22 +75,30 @@ app.get('/', async (_req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`🌐 Express server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`🌐 Express server running on port ${PORT}`));
 
 // --- Discord interaction handling ---
 client.on('interactionCreate', async interaction => {
+  if (!interaction.isChatInputCommand()) return;
+
+  const command = client.commands.get(interaction.commandName);
+  if (!command) return;
+
   try {
-    if (interaction.isCommand()) {
-      const command = client.commands.get(interaction.commandName);
-      if (!command) return;
-      await command.execute(interaction);
-    }
+    await command.execute(interaction);
   } catch (err) {
-    console.error('❌ Interaction error:', err);
-    if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply({ content: '⚠️ An error occurred while processing your command.', ephemeral: true });
+    console.error(`❌ Error running /${interaction.commandName}:`, err);
+
+    try {
+      if (!interaction.deferred && !interaction.replied) {
+        await interaction.reply({ content: '⚠️ Something went wrong.', ephemeral: true });
+      } else {
+        await interaction.followUp({ content: '⚠️ Something went wrong.', ephemeral: true });
+      }
+    } catch (error) {
+      if (error.code !== 10062 && error.code !== 40060) {
+        console.error('⚠️ Failed to send error message:', error);
+      }
     }
   }
 });
