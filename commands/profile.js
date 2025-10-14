@@ -3,7 +3,7 @@ import fetch from 'node-fetch';
 
 export const data = new SlashCommandBuilder()
   .setName('profile')
-  .setDescription('Load in-game profile!');
+  .setDescription('Load your in-game profile!');
 
 export const allowed = [];
 
@@ -44,7 +44,7 @@ async function getrobloxname(discordId, status) {
     const robloxId = data.robloxID;
     if (!robloxId) return 'Not linked';
 
-    let result;
+    let result; // ✅ fixed declaration
     if (status === 'USERID') {
       result = robloxId.toString();
     } else {
@@ -75,13 +75,8 @@ async function getUserCoins(userId) {
       },
     });
 
-    if (response.status === 404) {
-      return null;
-    }
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
-    }
+    if (response.status === 404) return null;
+    if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
 
     const data = await response.json();
     return data.value ?? null;
@@ -92,23 +87,34 @@ async function getUserCoins(userId) {
 }
 
 export async function execute(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  try {
+    await interaction.deferReply({ ephemeral: true }); // ✅ acknowledge once
 
-  const robloxName = await getrobloxname(interaction.user.id);
-  const robloxId = await getrobloxname(interaction.user.id, 'USERID');
-  const coins = robloxId && robloxId !== 'Not linked'
-    ? await getUserCoins(robloxId)
-    : null;
+    const robloxName = await getrobloxname(interaction.user.id);
+    const robloxId = await getrobloxname(interaction.user.id, 'USERID');
+    const coins = robloxId && robloxId !== 'Not linked'
+      ? await getUserCoins(robloxId)
+      : null;
 
-  const embed = new EmbedBuilder()
-    .setTitle('🍓 〉 Arcabloom Profile')
-    .setDescription(`Your in-game stats, ${interaction.user.username}!`)
-    .addFields(
-      { name: '🪙 Coins', value: coins !== null ? coins.toString() : 'No data found', inline: true },
-    )
-    .setColor(0xFFD700)
-    .setFooter({ text: 'Arcabloom Services ©️ 2025' })
-    .setTimestamp();
+    const embed = new EmbedBuilder()
+      .setTitle('🍓 〉 Arcabloom Profile')
+      .setDescription(`Your in-game stats, ${interaction.user.username}!`)
+      .addFields(
+      
+        { name: '🪙 Coins', value: coins !== null ? coins.toString() : 'No data found', inline: true },
+      )
+      .setColor(0xFFD700)
+      .setFooter({ text: 'Arcabloom Services ©️ 2025' })
+      .setTimestamp();
 
-  await interaction.editReply({ embeds: [embed] });
+    await interaction.editReply({ embeds: [embed] }); 
+  } catch (err) {
+    console.error('❌ Interaction error:', err);
+    if (!interaction.replied) {
+      await interaction.reply({
+        content: '⚠️ An error occurred while processing your command.',
+        ephemeral: true,
+      });
+    }
+  }
 }
