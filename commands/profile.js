@@ -95,10 +95,9 @@ export async function execute(interaction) {
 
   const embed = new EmbedBuilder()
     .setTitle('🍓 〉 Arcabloom Profile')
-    .setDescription('Here is your profile information!')
+    .setDescription(`Here is your profile information, ${username}!`)
     .addFields(
       { name: '🪙 Coins', value: `${coins}` },
-      { name: '🤖 Roblox Username', value: username }
     )
     .setColor(0xFFD700)
     .setFooter({ text: 'Arcabloom Services ©️ 2025' })
@@ -106,3 +105,4 @@ export async function execute(interaction) {
 
   await interaction.reply({ embeds: [embed], ephemeral: true });
 }
+
