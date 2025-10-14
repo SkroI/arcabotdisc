@@ -24,27 +24,32 @@ async function getUsername(userId) {
   }
 }
 
-async function getrobloxname(id) {
-  if (namecache[id]) return namecache[id];
+async function getrobloxname(discordId) {
+  if (namecache[discordId]) return namecache[discordId];
   try {
+    const guildId = process.env.GUILD_ID;
+
     const res = await fetch(
-      `https://api.blox.link/v4/public/discord-to-roblox/${id}`,
+      `https://api.blox.link/v4/public/guilds/${guildId}/discord-to-roblox/${discordId}`,
       { headers: { Authorization: key } }
     );
 
-    if (!res.ok) return 'Not linked';
-    const data = await res.json();
+    if (res.status === 404) return 'Not linked';
+    if (!res.ok) return 'API error';
 
+    const data = await res.json();
     const robloxId = data.robloxID;
     if (!robloxId) return 'Not linked';
 
     const username = await getUsername(robloxId);
-    namecache[id] = username;
+    namecache[discordId] = username;
     return username;
-  } catch {
-    return 'Error fetching username';
+  } catch (err) {
+    console.error('Error fetching Roblox name:', err);
+    return 'Error fetching name';
   }
 }
+
 
 export async function execute(interaction) {
   const robloxName = await getrobloxname(interaction.user.id);
@@ -55,8 +60,7 @@ export async function execute(interaction) {
     .addFields(
       { name: '💡 Developers', value: '• I_ItsRainingTacos\n• ScriptedDorito' },
       { name: '🎯 Testers', value: 'A lot of people' },
-      { name: '🤖 Roblox Username', value: robloxName },
-      { name: '🪪 Discord ID', value: interaction.user.id }
+      { name: '🤖 Roblox Username', value: robloxName }
     )
     .setColor(0xFFD700)
     .setFooter({ text: 'Arcabloom Services ©️ 2025' })
