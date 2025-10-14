@@ -69,9 +69,9 @@ async function getUserCoins(userId) {
   try {
     const url = `https://apis.roblox.com/ordered-data-stores/v1/universes/${universeId}/orderedDataStores/${dataStore}/scopes/global/entries?max_page_size=100&order_by=desc`;
     const response = await fetch(url, {
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
-        'x-api-key': process.env.ROBLOX_API_KEY 
+        'x-api-key': process.env.ROBLOX_API_KEY,
       },
     });
 
@@ -80,8 +80,8 @@ async function getUserCoins(userId) {
 
     if (!data.entries || data.entries.length === 0) return null;
 
-    // Look for the entry with matching userId
-    const userEntry = data.entries.find(entry => entry.userId.toString() === userId.toString());
+    // Corrected: use 'id' instead of 'userId'
+    const userEntry = data.entries.find(entry => entry.id.toString() === userId.toString());
     if (!userEntry) return null;
 
     return userEntry.value ?? null;
@@ -91,19 +91,23 @@ async function getUserCoins(userId) {
   }
 }
 
-
 export async function execute(interaction) {
   await interaction.deferReply({ ephemeral: true }); // defer immediately
 
   try {
     const robloxName = await getRobloxName(interaction.user.id);
     const robloxId = await getRobloxName(interaction.user.id, 'USERID');
-    const coins = robloxId && robloxId !== 'Not linked' ? await getUserCoins(robloxId) : null;
+    let coins = null;
+
+    if (robloxId && robloxId !== 'Not linked' && !isNaN(robloxId)) {
+      coins = await getUserCoins(robloxId);
+    }
 
     const embed = new EmbedBuilder()
       .setTitle('🍓 〉 Arcabloom Profile')
       .setDescription(`Your in-game stats, ${interaction.user.username}!`)
       .addFields(
+        { name: 'Roblox Username', value: robloxName, inline: true },
         { name: '🪙 Coins', value: coins !== null ? coins.toString() : 'No data found', inline: true },
       )
       .setColor(0xFFD700)
@@ -118,4 +122,3 @@ export async function execute(interaction) {
     } catch {}
   }
 }
-
