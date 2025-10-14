@@ -2,122 +2,99 @@ import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import fetch from 'node-fetch';
 
 export const data = new SlashCommandBuilder()
-  .setName('profile')
-  .setDescription('Load your in-game profile!');
+  .setName('help')
+  .setDescription('Get your Arcabloom profile info.');
 
 export const allowed = [];
+const namecache = {};
 
-const usernameCache = {};
-const nameCache = {};
-const key = process.env.BLOXLINK_KEY;
-const universeId = process.env.ROBLOX_UNIVERSE_ID;
-const dataStore = process.env.ROBLOX_LEADERSTAT_KEY;
-const scope = 'global';
+const BLOXLINK_KEY = process.env.BLOXLINK_KEY;
+const ROBLOX_API_KEY = process.env.ROBLOX_API_KEY;
+const GUILD_ID = process.env.GUILD_ID;
+const UNIVERSE_ID = process.env.ROBLOX_UNIVERSE_ID;
+const DATASTORE = 'Coins'; 
 
-// Fetch Roblox username from userId
-async function getUsername(userId) {
-  if (usernameCache[userId]) return usernameCache[userId];
-  try {
-    const res = await fetch(`https://users.roblox.com/v1/users/${userId}`);
-    if (!res.ok) return userId.toString();
-    const data = await res.json();
-    usernameCache[userId] = data.name || userId.toString();
-    return usernameCache[userId];
-  } catch {
-    return userId.toString();
-  }
-}
-
-// Fetch Roblox ID or name via Bloxlink
-async function getRobloxName(discordId, status) {
-  if (nameCache[discordId]) return nameCache[discordId];
+// Fetch Roblox ID from Discord ID via Blox.link
+async function getRobloxId(discordId) {
+  if (namecache[discordId]) return namecache[discordId];
 
   try {
-    const guildId = process.env.GUILD_ID;
     const res = await fetch(
-      `https://api.blox.link/v4/public/guilds/${guildId}/discord-to-roblox/${discordId}`,
-      { headers: { Authorization: key } }
+      `https://api.blox.link/v4/public/guilds/${GUILD_ID}/discord-to-roblox/${discordId}`,
+      { headers: { Authorization: BLOXLINK_KEY } }
     );
 
-    if (res.status === 404) return 'Not linked';
-    if (!res.ok) return 'API error';
+    if (res.status === 404) return null; // Not linked
+    if (!res.ok) return null;
 
     const data = await res.json();
-    const robloxId = data.robloxID;
-    if (!robloxId) return 'Not linked';
+    const robloxId = data.robloxID || null;
 
-    let result;
-    if (status === 'USERID') {
-      result = robloxId.toString();
-    } else {
-      result = await getUsername(robloxId);
-    }
-
-    nameCache[discordId] = result;
-    return result;
+    if (robloxId) namecache[discordId] = robloxId;
+    return robloxId;
   } catch (err) {
-    console.error('❌ Error fetching Roblox name:', err);
-    return 'Error fetching name';
+    console.error('Error fetching Roblox ID:', err);
+    return null;
   }
 }
 
-// Fetch user coins from leaderboard-style ordered DataStore
-async function getUserCoins(userId) {
-  if (!process.env.ROBLOX_API_KEY || !universeId || !dataStore) {
-    console.error('❌ Missing Roblox config (API key, universe ID, datastore)');
-    return null;
-  }
+async function getCoins(robloxId) {
+  if (!robloxId) return 0;
 
+  let cursor = null;
   try {
-    const url = `https://apis.roblox.com/ordered-data-stores/v1/universes/${universeId}/orderedDataStores/${dataStore}/scopes/global/entries?max_page_size=100&order_by=desc`;
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ROBLOX_API_KEY,
-      },
-    });
+    do {
+      const url = new URL(`https://apis.roblox.com/ordered-data-stores/v1/universes/${UNIVERSE_ID}/orderedDataStores/${DATASTORE}/scopes/global/entries`);
+      url.searchParams.set('max_page_size', 100);
+      url.searchParams.set('order_by', 'desc');
+      if (cursor) url.searchParams.set('cursor', cursor);
 
-    if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-    const data = await response.json();
-    if (!data.entries || data.entries.length === 0) return null;
+      const response = await fetch(url.toString(), {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': ROBLOX_API_KEY,
+        },
+      });
 
-    const userEntry = data.entries.find(entry => entry.id.toString() === userId.toString());
-    return userEntry ? userEntry.value ?? null : null;
+      if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+      const data = await response.json();
+
+      const entry = data.entries.find(e => e.id === robloxId);
+      if (entry) return entry.value;
+
+      cursor = data.nextPageCursor || null;
+    } while (cursor);
+
+    return 0; 
   } catch (err) {
-    console.error(`❌ Error fetching coins for user ${userId}:`, err);
-    return null;
+    console.error('Error fetching coins:', err);
+    return 0;
   }
 }
 
-// Main command execution
+// Command execution
 export async function execute(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  const robloxId = await getRobloxId(interaction.user.id);
 
-  try {
-    const robloxName = await getRobloxName(interaction.user.id);
-    const robloxId = await getRobloxName(interaction.user.id, 'USERID');
-
-    let coins = null;
-    if (robloxId && robloxId !== 'Not linked' && !isNaN(robloxId)) {
-      coins = await getUserCoins(robloxId);
-    }
-
-    const embed = new EmbedBuilder()
-      .setTitle('🍓 〉 Arcabloom Profile')
-      .setDescription(`Your in-game stats, ${interaction.user.username}!`)
-      .addFields(
-        { name: 'Roblox Username', value: robloxName, inline: true },
-        { name: '🪙 Coins', value: coins !== null ? coins.toString() : 'No data found', inline: true },
-      )
-      .setColor(0xFFD700)
-      .setFooter({ text: 'Arcabloom Services ©️ 2025' })
-      .setTimestamp();
-
-    await interaction.editReply({ embeds: [embed] });
-  } catch (err) {
-    console.error('❌ Profile command error:', err);
-    try {
-      await interaction.editReply({ content: '⚠️ Something went wrong while fetching your profile.' });
-    } catch {}
+  if (!robloxId) {
+    return interaction.reply({
+      content: '❌ Your Discord account is not linked to Roblox.',
+      ephemeral: true,
+    });
   }
+
+  const coins = await getCoins(robloxId);
+
+  const embed = new EmbedBuilder()
+    .setTitle('🍓 〉 Arcabloom Profile')
+    .setDescription('Here is your profile information!')
+    .addFields(
+      { name: '🪙 Coins', value: `${coins}` },
+      { name: '🤖 Roblox ID', value: robloxId.toString() }
+    )
+    .setColor(0xFFD700)
+    .setFooter({ text: 'Arcabloom Services ©️ 2025' })
+    .setTimestamp();
+
+  await interaction.reply({ embeds: [embed], ephemeral: true });
 }
