@@ -42,7 +42,7 @@ async function getRobloxId(discordId) {
 
 // Fetch coins using the working leaderboard approach
 async function getCoins(robloxId) {
-  if (!robloxId) return 0;
+  if (!robloxId) return { coins: 0, rank: 0 };
 
   try {
     const url = `https://apis.roblox.com/ordered-data-stores/v1/universes/${UNIVERSE_ID}/orderedDataStores/${DATASTORE}/scopes/${SCOPE}/entries?max_page_size=100&order_by=desc`;
@@ -56,15 +56,24 @@ async function getCoins(robloxId) {
     if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
     const data = await response.json();
 
-    if (!data.entries || data.entries.length === 0) return 0;
+    if (!data.entries || data.entries.length === 0) return { coins: 0, rank: 0 };
 
-    const playerEntry = data.entries.find(entry => entry.id === robloxId);
-    return playerEntry ? playerEntry.value : 0;
+    // Find the player's entry
+    const playerIndex = data.entries.findIndex(entry => entry.id === robloxId);
+    
+    if (playerIndex === -1) return { coins: 0, rank: 0 };
+
+    const playerEntry = data.entries[playerIndex];
+
+    // Rank is index + 1 (because array is 0-based)
+    return { coins: playerEntry.value, rank: playerIndex + 1 };
+    
   } catch (err) {
     console.error('Error fetching coins:', err);
-    return 0;
+    return { coins: 0, rank: 0 };
   }
 }
+
 
 // Optional: fetch Roblox username for embed
 async function getUsername(userId) {
@@ -90,7 +99,7 @@ export async function execute(interaction) {
     });
   }
 
-  const coins = await getCoins(robloxId);
+  const { coins, rank } = await getCoins(robloxId);
   const username = await getUsername(robloxId);
 
   const embed = new EmbedBuilder()
@@ -98,6 +107,8 @@ export async function execute(interaction) {
     .setDescription(`Here is your profile information, ${username}!`)
     .addFields(
       { name: '🪙 Coins', value: `${coins}` },
+      { name: '🏆 Rank', value: `#${rank}` },
+
     )
     .setColor(0xFFD700)
     .setFooter({ text: 'Arcabloom Services ©️ 2025' })
@@ -105,4 +116,5 @@ export async function execute(interaction) {
 
   await interaction.reply({ embeds: [embed], ephemeral: true });
 }
+
 
