@@ -91,6 +91,8 @@ export async function execute(interaction) {
   await interaction.deferReply({ ephemeral: true });
 
   const robloxId = await getRobloxId(username);
+  console.console.log(robloxId);
+  
   if (!robloxId)
     return interaction.editReply({ content: `❌ Could not find Roblox user **${username}**.` });
 
