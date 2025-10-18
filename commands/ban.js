@@ -101,7 +101,7 @@ async function sendMessageToRoblox(userId) {
           'x-api-key': ROBLOX_API_KEY,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: { userId } }),
+        body: JSON.stringify({ userId }), // <-- Correct format
       }
     );
 
@@ -116,6 +116,7 @@ async function sendMessageToRoblox(userId) {
     console.error('Messaging service unknown error:', err);
   }
 }
+
 
 // ---------- Command Execution ----------
 export async function execute(interaction) {
