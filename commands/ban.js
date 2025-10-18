@@ -11,24 +11,23 @@ import fetch from 'node-fetch';
 
 export const data = new SlashCommandBuilder()
   .setName('ban')
-  .setDescription('Arcabloom ban cmd')
+  .setDescription('Ban a Roblox player from the game.')
   .addStringOption(opt =>
     opt.setName('username')
-      .setDescription('rblx username')
+      .setDescription('Roblox username to ban')
       .setRequired(true)
   );
 
 // CONFIG
-const allowedRoles = ['1427338616580870247']; // Admin roles
+const allowedRoles = ['1427338616580870247']; // Discord role IDs allowed to use the command
 const ROBLOX_API_KEY = process.env.ROBLOX_API_KEY;
 const UNIVERSE_ID = process.env.ROBLOX_UNIVERSE_ID;
 const DATASTORE_NAME = 'Banland';
-const SCOPE = 'global';
 
-// Caches
+// Cache for username lookups
 const usernameCache = {};
 
-// ✅ Reliable Roblox username → ID lookup
+// ✅ Username → UserId
 async function getRobloxId(username) {
   try {
     const res = await fetch('https://users.roblox.com/v1/usernames/users', {
@@ -54,7 +53,7 @@ async function getRobloxId(username) {
   }
 }
 
-// ✅ Your username resolver (kept as-is)
+// ✅ UserId → Username
 async function getUsername(userId) {
   if (usernameCache[userId]) return usernameCache[userId];
   try {
@@ -68,11 +67,12 @@ async function getUsername(userId) {
   }
 }
 
-// Helpers
+// ✅ Compute MD5 hash for Roblox API
 function computeContentMD5(bodyString) {
   return crypto.createHash('md5').update(bodyString, 'utf8').digest('base64');
 }
 
+// ✅ Duration resolver
 function getBanTime(option) {
   if (option === 'forever') return 'Forever';
   const now = Math.floor(Date.now() / 1000);
@@ -85,14 +85,15 @@ function getBanTime(option) {
   return now + (durations[option] || 0);
 }
 
+// ✅ Roblox Datastore API: Set Entry
 async function setDatastoreEntry(userId, valueObj) {
   if (!ROBLOX_API_KEY) throw new Error('ROBLOX_API_KEY missing');
   if (!UNIVERSE_ID) throw new Error('ROBLOX_UNIVERSE_ID missing');
 
-  const url = `https://apis.roblox.com/datastores/v1/universes/${UNIVERSE_ID}/standard-datastores/datastore/entries/entry?datastoreName=${DATASTORE_NAME}&entryKey=${userId}`;
-
   const bodyString = JSON.stringify(valueObj);
   const md5 = computeContentMD5(bodyString);
+
+  const url = `https://apis.roblox.com/datastores/v1/universes/${UNIVERSE_ID}/standard-datastores/datastore/entries/entry?datastoreName=${DATASTORE_NAME}&entryKey=${userId}`;
 
   const headers = {
     'x-api-key': ROBLOX_API_KEY,
@@ -121,7 +122,7 @@ async function setDatastoreEntry(userId, valueObj) {
 
 // ✅ Command execution
 export async function execute(interaction) {
-  // Check roles
+  // Permission check
   const hasAccess = allowedRoles.some(role => interaction.member.roles.cache.has(role));
   if (!hasAccess) {
     return interaction.reply({ content: '🚫 You do not have permission to use this command.', ephemeral: true });
@@ -203,6 +204,7 @@ export async function execute(interaction) {
 
       if (confirmInt.customId === 'confirm') {
         const valueObj = { Banned: true, Time: banTime };
+
         try {
           const result = await setDatastoreEntry(robloxId, valueObj);
           await confirmInt.update({
