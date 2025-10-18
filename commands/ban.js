@@ -112,14 +112,14 @@ async function setDatastoreEntry(userId, valueObj) {
 
 export async function execute(interaction) {
   if (!allowedRoles.some(role => interaction.member.roles.cache.has(role))) {
-    return interaction.reply({ content: '🚫 You do not have permission.', ephemeral: true });
+    return interaction.reply({ content: "You don't have permission to ban people around here..", ephemeral: true });
   }
 
   await interaction.deferReply({ ephemeral: true });
 
   const username = interaction.options.getString('username');
   const robloxId = await getRobloxId(username);
-  if (!robloxId) return interaction.editReply({ content: `❌ Could not find Roblox user **${username}**.` });
+  if (!robloxId) return interaction.editReply({ content: ` Error occurred while searching really hard for this player's username :  **${username}**.` });
 
   const displayName = await getUsername(robloxId);
 const headshot = await getHeadshotUrl(robloxId) || null;
@@ -143,7 +143,7 @@ const headshot = await getHeadshotUrl(robloxId) || null;
   const collector = msg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 120_000 });
 
   collector.on('collect', async btnInt => {
-    if (btnInt.user.id !== interaction.user.id) return btnInt.reply({ content: '⛔ Only the command user can respond.', ephemeral: true });
+    if (btnInt.user.id !== interaction.user.id) return btnInt.reply({ content: 'Only the command user can respond.', ephemeral: true });
 
     const choice = btnInt.customId;
     const durationSeconds = getBanDuration(choice);
@@ -168,7 +168,7 @@ const headshot = await getHeadshotUrl(robloxId) || null;
     const confirmCollector = msg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 120_000 });
 
     confirmCollector.on('collect', async confirmInt => {
-      if (confirmInt.user.id !== interaction.user.id) return confirmInt.reply({ content: '⛔ Only the command user can respond.', ephemeral: true });
+      if (confirmInt.user.id !== interaction.user.id) return confirmInt.reply({ content: 'Only the command user can respond.', ephemeral: true });
 
       if (confirmInt.customId === 'back') {
         await confirmInt.update({ embeds: [embed], components: [buttonsRow] });
@@ -203,7 +203,7 @@ const headshot = await getHeadshotUrl(robloxId) || null;
             embeds: [
               new EmbedBuilder()
                 .setTitle('❌ Datastore Error')
-                .setDescription(`Status: ${err.status || 'unknown'}\nResponse:\`\`\`${bodyPreview}\`\`\``)
+                .setDescription(`An error occurred while processing the ban`)
                 .setColor(0xff0000)
             ],
             components: []
@@ -218,7 +218,7 @@ const headshot = await getHeadshotUrl(robloxId) || null;
   collector.on('end', (_, reason) => {
     if (reason === 'time') {
       interaction.editReply({
-        embeds: [new EmbedBuilder().setTitle('⌛ Timed Out').setDescription('No selection made.').setColor(0x808080)],
+        embeds: [new EmbedBuilder().setTitle('Oops run out of time..').setDescription('Please try again').setColor(0x808080)],
         components: []
       }).catch(() => {});
     }
