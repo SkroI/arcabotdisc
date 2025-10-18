@@ -159,7 +159,6 @@ const headshot = await getHeadshotUrl(robloxId) || null;
 
     const confirmRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('confirm').setLabel('✅ Confirm').setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId('back').setLabel('🔙 Back').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId('cancel').setLabel('❌ Cancel').setStyle(ButtonStyle.Danger)
     );
 
@@ -170,11 +169,7 @@ const headshot = await getHeadshotUrl(robloxId) || null;
     confirmCollector.on('collect', async confirmInt => {
       if (confirmInt.user.id !== interaction.user.id) return confirmInt.reply({ content: 'Only the command user can respond.', ephemeral: true });
 
-      if (confirmInt.customId === 'back') {
-        await confirmInt.update({ embeds: [embed], components: [buttonsRow] });
-        confirmCollector.stop();
-        return;
-      }
+
 
       if (confirmInt.customId === 'cancel') {
         await confirmInt.update({ embeds: [new EmbedBuilder().setTitle('❌ Ban Cancelled').setColor(0x808080)], components: [] });
