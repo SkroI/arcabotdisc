@@ -11,10 +11,10 @@ import fetch from 'node-fetch';
 
 export const data = new SlashCommandBuilder()
   .setName('ban')
-  .setDescription('Ban a Roblox player from the game.')
+  .setDescription('Ban plr from Arcabloom')
   .addStringOption(opt =>
     opt.setName('username')
-      .setDescription('Roblox username to ban')
+      .setDescription('username')
       .setRequired(true)
   );
 
