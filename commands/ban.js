@@ -1,4 +1,3 @@
-// ban.js
 import {
   SlashCommandBuilder,
   EmbedBuilder,
@@ -12,35 +11,64 @@ import fetch from 'node-fetch';
 
 export const data = new SlashCommandBuilder()
   .setName('ban')
-  .setDescription('Ban a Roblox player by username')
+  .setDescription('Arcabloom ban cmd')
   .addStringOption(opt =>
     opt.setName('username')
-      .setDescription('Roblox username to ban')
+      .setDescription('rblx username')
       .setRequired(true)
   );
 
-// CONFIG: adjust as needed
-const allowedRoles = ['1427338616580870247']; // admin roles
+// CONFIG
+const allowedRoles = ['1427338616580870247']; // Admin roles
 const ROBLOX_API_KEY = process.env.ROBLOX_API_KEY;
 const UNIVERSE_ID = process.env.ROBLOX_UNIVERSE_ID;
 const DATASTORE_NAME = 'Banland';
 const SCOPE = 'global';
 
-// Helper: get roblox id from username (legacy endpoint but works)
+// Caches
+const usernameCache = {};
+
+// ✅ Reliable Roblox username → ID lookup
 async function getRobloxId(username) {
   try {
-    const res = await fetch(`https://api.roblox.com/users/get-by-username?username=${username}`);
-    if (!res.ok) return null;
+    const res = await fetch('https://users.roblox.com/v1/usernames/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usernames: [username] }),
+    });
+
+    if (!res.ok) {
+      console.error('Roblox username lookup failed:', res.status);
+      return null;
+    }
+
     const data = await res.json();
-    // If user not found, api returns {"success":false,"errorMessage":"User not found"}
-    if (data && data.Id) return String(data.Id);
+    if (data?.data?.length && data.data[0].id) {
+      return String(data.data[0].id);
+    }
+
+    return null;
   } catch (err) {
-    console.error('getRobloxId error', err);
+    console.error('getRobloxId error:', err);
+    return null;
   }
-  return null;
 }
 
-// compute base64 md5 of the exact JSON body
+// ✅ Your username resolver (kept as-is)
+async function getUsername(userId) {
+  if (usernameCache[userId]) return usernameCache[userId];
+  try {
+    const res = await fetch(`https://users.roblox.com/v1/users/${userId}`);
+    if (!res.ok) return userId;
+    const data = await res.json();
+    usernameCache[userId] = data.name || userId;
+    return usernameCache[userId];
+  } catch {
+    return userId;
+  }
+}
+
+// Helpers
 function computeContentMD5(bodyString) {
   return crypto.createHash('md5').update(bodyString, 'utf8').digest('base64');
 }
@@ -57,10 +85,9 @@ function getBanTime(option) {
   return now + (durations[option] || 0);
 }
 
-// Real Roblox Set Entry call with robust error return
 async function setDatastoreEntry(userId, valueObj) {
-  if (!ROBLOX_API_KEY) throw new Error('ROBLOX_API_KEY environment variable not set');
-  if (!UNIVERSE_ID) throw new Error('UNIVERSE_ID (ROBLOX_UNIVERSE_ID) not set');
+  if (!ROBLOX_API_KEY) throw new Error('ROBLOX_API_KEY missing');
+  if (!UNIVERSE_ID) throw new Error('ROBLOX_UNIVERSE_ID missing');
 
   const url = `https://apis.roblox.com/datastores/v1/universes/${UNIVERSE_ID}/standard-datastores/datastore/entries/entry?datastoreName=${DATASTORE_NAME}&entryKey=${userId}`;
 
@@ -71,19 +98,13 @@ async function setDatastoreEntry(userId, valueObj) {
     'x-api-key': ROBLOX_API_KEY,
     'content-type': 'application/json',
     'content-md5': md5,
-    // roblox-entry-userids header expects something like: [269323]
     'roblox-entry-userids': `[${userId}]`,
-    // attributes can be an empty JSON object string
     'roblox-entry-attributes': '{}',
   };
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: bodyString,
-  });
+  const res = await fetch(url, { method: 'POST', headers, body: bodyString });
+  const text = await res.text();
 
-  const text = await res.text(); // read raw body for diagnostics
   if (!res.ok) {
     const err = new Error(`HTTP ${res.status}`);
     err.status = res.status;
@@ -91,7 +112,6 @@ async function setDatastoreEntry(userId, valueObj) {
     throw err;
   }
 
-  // try parse json on success
   try {
     return JSON.parse(text || '{}');
   } catch {
@@ -99,26 +119,29 @@ async function setDatastoreEntry(userId, valueObj) {
   }
 }
 
+// ✅ Command execution
 export async function execute(interaction) {
-  // role check
+  // Check roles
   const hasAccess = allowedRoles.some(role => interaction.member.roles.cache.has(role));
   if (!hasAccess) {
     return interaction.reply({ content: '🚫 You do not have permission to use this command.', ephemeral: true });
   }
 
-  const username = interaction.options.getString('username');
   await interaction.deferReply({ ephemeral: true });
 
+  const username = interaction.options.getString('username');
   const robloxId = await getRobloxId(username);
+
   if (!robloxId) {
     return interaction.editReply({ content: `❌ Could not find Roblox user **${username}**.` });
   }
 
+  const displayName = await getUsername(robloxId);
   const headshot = `https://www.roblox.com/headshot-thumbnail/image?userId=${robloxId}&width=420&height=420&format=png`;
 
   const embed = new EmbedBuilder()
     .setTitle('🚨 Ban Player')
-    .setDescription(`Select a ban duration for **${username}** (${robloxId})`)
+    .setDescription(`Select a ban duration for **${displayName}** (${robloxId})`)
     .setThumbnail(headshot)
     .setColor(0xff0000);
 
@@ -132,27 +155,19 @@ export async function execute(interaction) {
 
   const msg = await interaction.editReply({ embeds: [embed], components: [buttonsRow] });
 
-  // collector for first-selection
-  const collector = msg.createMessageComponentCollector({
-    componentType: ComponentType.Button,
-    time: 120000,
-  });
-
-  // we'll hold the currently selected choice so Back can re-open
-  let currentChoice = null;
+  const collector = msg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 120000 });
 
   collector.on('collect', async btnInt => {
-    if (btnInt.user.id !== interaction.user.id) {
+    if (btnInt.user.id !== interaction.user.id)
       return btnInt.reply({ content: '⛔ Only the command user can respond.', ephemeral: true });
-    }
 
-    currentChoice = btnInt.customId;
-    const banTime = getBanTime(currentChoice);
+    const choice = btnInt.customId;
+    const banTime = getBanTime(choice);
 
     const confirmEmbed = new EmbedBuilder()
       .setTitle('⚠️ Confirm Ban')
       .setDescription(
-        `You are about to ban **${username}** (${robloxId})\n**Duration:** ${banTime === 'Forever' ? 'Forever' : `<t:${banTime}:R>`}`
+        `You are about to ban **${displayName}** (${robloxId})\n**Duration:** ${banTime === 'Forever' ? 'Forever' : `<t:${banTime}:R>`}`
       )
       .setThumbnail(headshot)
       .setColor(0xffa500);
@@ -163,107 +178,66 @@ export async function execute(interaction) {
       new ButtonBuilder().setCustomId('cancel').setLabel('❌ Cancel').setStyle(ButtonStyle.Danger),
     );
 
-    // update the message to confirmation
     await btnInt.update({ embeds: [confirmEmbed], components: [confirmRow] });
 
-    // stop the first collector to avoid multiple nested collectors
-    collector.stop();
-
-    // collect confirmations
-    const confirmCollector = msg.createMessageComponentCollector({
-      componentType: ComponentType.Button,
-      time: 120000,
-    });
+    const confirmCollector = msg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 120000 });
 
     confirmCollector.on('collect', async confirmInt => {
-      if (confirmInt.user.id !== interaction.user.id) {
+      if (confirmInt.user.id !== interaction.user.id)
         return confirmInt.reply({ content: '⛔ Only the command user can respond.', ephemeral: true });
-      }
 
       if (confirmInt.customId === 'back') {
-        // go back to original selection
         await confirmInt.update({ embeds: [embed], components: [buttonsRow] });
         confirmCollector.stop();
-        // re-create the first collector again by calling the function recursively:
-        // (simpler approach: re-run execute to re-render; for now create a new collector)
-        // to avoid complexity, we will re-create the collector by directly using msg.createMessageComponentCollector again:
-        // NOTE: The original function's collector variable is out-of-scope now; simplest approach is to re-run the command logic:
-        // For clarity and reliability: re-edit the original message (already done), then return so user can click again.
-        // Recreate a new collector:
-        const newCollector = msg.createMessageComponentCollector({
-          componentType: ComponentType.Button,
-          time: 120000,
-        });
-        newCollector.on('collect', async newBtn => {
-          if (newBtn.user.id !== interaction.user.id) return newBtn.reply({ content: '⛔ Only the command user can respond.', ephemeral: true });
-          // delegate to same flow by simulating a click: update currentChoice and show confirm
-          currentChoice = newBtn.customId;
-          const newBanTime = getBanTime(currentChoice);
-          const newConfirmEmbed = new EmbedBuilder()
-            .setTitle('⚠️ Confirm Ban')
-            .setDescription(`You are about to ban **${username}** (${robloxId})\n**Duration:** ${newBanTime === 'Forever' ? 'Forever' : `<t:${newBanTime}:R>`}`)
-            .setThumbnail(headshot)
-            .setColor(0xffa500);
-          const newConfirmRow = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId('confirm').setLabel('✅ Confirm').setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId('back').setLabel('🔙 Back').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId('cancel').setLabel('❌ Cancel').setStyle(ButtonStyle.Danger),
-          );
-          await newBtn.update({ embeds: [newConfirmEmbed], components: [newConfirmRow] });
-
-          // now we need a nested confirm collector similar to above — to keep this code manageable,
-          // allow the outer confirmCollector to handle the next button press by stopping this newCollector and returning.
-          newCollector.stop();
-        });
-
         return;
-      } else if (confirmInt.customId === 'cancel') {
-        await confirmInt.update({ embeds: [new EmbedBuilder().setTitle('❌ Ban Cancelled').setColor(0x808080)], components: [] });
+      }
+
+      if (confirmInt.customId === 'cancel') {
+        await confirmInt.update({
+          embeds: [new EmbedBuilder().setTitle('❌ Ban Cancelled').setColor(0x808080)],
+          components: [],
+        });
         confirmCollector.stop();
         return;
-      } else if (confirmInt.customId === 'confirm') {
-        // perform datastore write
-        const banTimeValue = getBanTime(currentChoice);
-        const valueObj = { Banned: true, Time: banTimeValue };
+      }
+
+      if (confirmInt.customId === 'confirm') {
+        const valueObj = { Banned: true, Time: banTime };
         try {
           const result = await setDatastoreEntry(robloxId, valueObj);
-          // success
           await confirmInt.update({
             embeds: [
               new EmbedBuilder()
                 .setTitle('✅ Player Banned')
-                .setDescription(`**${username}** (${robloxId}) has been banned.\n**Duration:** ${banTimeValue === 'Forever' ? 'Forever' : `<t:${banTimeValue}:R>`}`)
+                .setDescription(`**${displayName}** (${robloxId}) has been banned.\n**Duration:** ${banTime === 'Forever' ? 'Forever' : `<t:${banTime}:R>`}`)
                 .setThumbnail(headshot)
                 .setColor(0x00ff00),
             ],
             components: [],
           });
-          console.log('Datastore write success:', result);
+          console.log('✅ Datastore write success:', result);
         } catch (err) {
-          // err may contain status/body as set above
-          console.error('Datastore write error:', err);
-          const bodyPreview = (err.body && String(err.body).slice(0, 1500)) || 'No response body';
+          console.error('❌ Datastore write error:', err);
+          const bodyPreview = (err.body && String(err.body).slice(0, 1000)) || 'No response body';
           await confirmInt.update({
             embeds: [
               new EmbedBuilder()
                 .setTitle('❌ Datastore Error')
-                .setDescription(`Status: ${err.status || 'unknown'}\nResponse: \`\`\`${bodyPreview}\`\`\`\nCheck API key, universe id, and permissions.`)
+                .setDescription(`Status: ${err.status || 'unknown'}\nResponse:\`\`\`${bodyPreview}\`\`\``)
                 .setColor(0xff0000),
             ],
             components: [],
           });
         }
         confirmCollector.stop();
-        return;
       }
-    }); // confirmCollector collected
-  }); // collector collected
+    });
+  });
 
   collector.on('end', (_, reason) => {
-    // if ended without selection, disable buttons
     if (reason === 'time') {
       interaction.editReply({
-        embeds: [new EmbedBuilder().setTitle('⌛ Timed out').setDescription('No selection made.').setColor(0x808080)],
+        embeds: [new EmbedBuilder().setTitle('⌛ Timed Out').setDescription('No selection made.').setColor(0x808080)],
         components: [],
       }).catch(() => {});
     }
