@@ -36,19 +36,10 @@ async function getRobloxId(username) {
       body: JSON.stringify({ usernames: [username] }),
     });
 
-    if (!res.ok) {
-      console.error('Roblox username lookup failed:', res.status);
-      return null;
-    }
-
+    if (!res.ok) return null;
     const data = await res.json();
-    if (data?.data?.length && data.data[0].id) {
-      return String(data.data[0].id);
-    }
-
-    return null;
-  } catch (err) {
-    console.error('getRobloxId error:', err);
+    return data?.data?.[0]?.id ? String(data.data[0].id) : null;
+  } catch {
     return null;
   }
 }
@@ -122,7 +113,6 @@ async function setDatastoreEntry(userId, valueObj) {
 
 // ✅ Command execution
 export async function execute(interaction) {
-  // Permission check
   const hasAccess = allowedRoles.some(role => interaction.member.roles.cache.has(role));
   if (!hasAccess) {
     return interaction.reply({ content: '🚫 You do not have permission to use this command.', ephemeral: true });
@@ -156,7 +146,7 @@ export async function execute(interaction) {
 
   const msg = await interaction.editReply({ embeds: [embed], components: [buttonsRow] });
 
-  const collector = msg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 120000 });
+  const collector = msg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 120_000 });
 
   collector.on('collect', async btnInt => {
     if (btnInt.user.id !== interaction.user.id)
@@ -168,7 +158,7 @@ export async function execute(interaction) {
     const confirmEmbed = new EmbedBuilder()
       .setTitle('⚠️ Confirm Ban')
       .setDescription(
-        `You are about to ban **${displayName}** (${robloxId})\n**Duration:** ${banTime === 'Forever' ? 'Forever' : `<t:${banTime}:R>`}`
+        `You are about to ban **${displayName}** (${robloxId})\n**Banned till:** ${banTime === 'Forever' ? 'Forever' : `<t:${banTime}:R>`}`
       )
       .setThumbnail(headshot)
       .setColor(0xffa500);
@@ -179,25 +169,33 @@ export async function execute(interaction) {
       new ButtonBuilder().setCustomId('cancel').setLabel('❌ Cancel').setStyle(ButtonStyle.Danger),
     );
 
-    await btnInt.update({ embeds: [confirmEmbed], components: [confirmRow] });
+    try {
+      await btnInt.update({ embeds: [confirmEmbed], components: [confirmRow] });
+    } catch (err) {
+      console.error('Interaction already acknowledged:', err);
+    }
 
-    const confirmCollector = msg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 120000 });
+    const confirmCollector = msg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 120_000 });
 
     confirmCollector.on('collect', async confirmInt => {
       if (confirmInt.user.id !== interaction.user.id)
         return confirmInt.reply({ content: '⛔ Only the command user can respond.', ephemeral: true });
 
       if (confirmInt.customId === 'back') {
-        await confirmInt.update({ embeds: [embed], components: [buttonsRow] });
+        try {
+          await confirmInt.update({ embeds: [embed], components: [buttonsRow] });
+        } catch {}
         confirmCollector.stop();
         return;
       }
 
       if (confirmInt.customId === 'cancel') {
-        await confirmInt.update({
-          embeds: [new EmbedBuilder().setTitle('❌ Ban Cancelled').setColor(0x808080)],
-          components: [],
-        });
+        try {
+          await confirmInt.update({
+            embeds: [new EmbedBuilder().setTitle('❌ Ban Cancelled').setColor(0x808080)],
+            components: [],
+          });
+        } catch {}
         confirmCollector.stop();
         return;
       }
@@ -207,29 +205,33 @@ export async function execute(interaction) {
 
         try {
           const result = await setDatastoreEntry(robloxId, valueObj);
-          await confirmInt.update({
-            embeds: [
-              new EmbedBuilder()
-                .setTitle('✅ Player Banned')
-                .setDescription(`**${displayName}** (${robloxId}) has been banned.\n**Duration:** ${banTime === 'Forever' ? 'Forever' : `<t:${banTime}:R>`}`)
-                .setThumbnail(headshot)
-                .setColor(0x00ff00),
-            ],
-            components: [],
-          });
+          try {
+            await confirmInt.update({
+              embeds: [
+                new EmbedBuilder()
+                  .setTitle('✅ Player Banned')
+                  .setDescription(`**${displayName}** (${robloxId}) has been banned.\n**Banned till:** ${banTime === 'Forever' ? 'Forever' : `<t:${banTime}:R>`}`)
+                  .setThumbnail(headshot)
+                  .setColor(0x00ff00),
+              ],
+              components: [],
+            });
+          } catch {}
           console.log('✅ Datastore write success:', result);
         } catch (err) {
           console.error('❌ Datastore write error:', err);
           const bodyPreview = (err.body && String(err.body).slice(0, 1000)) || 'No response body';
-          await confirmInt.update({
-            embeds: [
-              new EmbedBuilder()
-                .setTitle('❌ Datastore Error')
-                .setDescription(`Status: ${err.status || 'unknown'}\nResponse:\`\`\`${bodyPreview}\`\`\``)
-                .setColor(0xff0000),
-            ],
-            components: [],
-          });
+          try {
+            await confirmInt.update({
+              embeds: [
+                new EmbedBuilder()
+                  .setTitle('❌ Datastore Error')
+                  .setDescription(`Status: ${err.status || 'unknown'}\nResponse:\`\`\`${bodyPreview}\`\`\``)
+                  .setColor(0xff0000),
+              ],
+              components: [],
+            });
+          } catch {}
         }
         confirmCollector.stop();
       }
