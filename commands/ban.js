@@ -12,7 +12,7 @@ import fetch from 'node-fetch';
 // CONFIG
 const allowedRoles = ['1427338616580870247'];
 const ROBLOX_API_KEY = process.env.ROBLOX_API_KEY;
-const UNIVERSE_ID = process.env.UNIVERSE_ID;
+const UNIVERSE_ID = process.env.ROBLOX_UNIVERSE_ID;
 const DATASTORE_NAME = 'Banland';
 const usernameCache = {};
 
@@ -218,7 +218,7 @@ export async function execute(interaction) {
   collector.on('end', (_, reason) => {
     if (reason === 'time') {
       interaction.editReply({
-        embeds: [new EmbedBuilder().setTitle('⌛ Time expired').setDescription('Please try again.').setColor(0x808080)],
+        embeds: [new EmbedBuilder().setTitle('Oops run out of time..').setDescription('Please try again').setColor(0x808080)],
         components: []
       }).catch(() => {});
     }
