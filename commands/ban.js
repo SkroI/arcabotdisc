@@ -91,7 +91,7 @@ async function setDatastoreEntry(userId, valueObj) {
 }
 
 // ---------- Messaging Service ----------
-async function sendMessageToRoblox(userId) {
+async function sendMessageToRoblox(userId, reason = "Ban") {
   try {
     const res = await fetch(
       `https://apis.roblox.com/messaging-service/v1/universes/${UNIVERSE_ID}/topics/BanWaveAPI`,
@@ -101,7 +101,9 @@ async function sendMessageToRoblox(userId) {
           'x-api-key': ROBLOX_API_KEY,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ userId: String(userId) }), // <-- convert to string
+        body: JSON.stringify({
+          message: JSON.stringify({ UserID: userId, Reason: reason })
+        }),
       }
     );
 
