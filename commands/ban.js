@@ -9,6 +9,13 @@ import {
 import crypto from 'crypto';
 import fetch from 'node-fetch';
 
+// CONFIG
+const allowedRoles = ['1427338616580870247'];
+const ROBLOX_API_KEY = process.env.ROBLOX_API_KEY;
+const UNIVERSE_ID = process.env.ROBLOX_UNIVERSE_ID;
+const DATASTORE_NAME = 'Banland';
+const usernameCache = {};
+
 export const data = new SlashCommandBuilder()
   .setName('ban')
   .setDescription('Ban plr from Arcabloom')
@@ -17,13 +24,6 @@ export const data = new SlashCommandBuilder()
       .setDescription('username')
       .setRequired(true)
   );
-
-// CONFIG
-const allowedRoles = ['1427338616580870247'];
-const ROBLOX_API_KEY = process.env.ROBLOX_API_KEY;
-const UNIVERSE_ID = process.env.ROBLOX_UNIVERSE_ID;
-const DATASTORE_NAME = 'Banland';
-const usernameCache = {};
 
 async function getRobloxId(username) {
   try {
@@ -52,7 +52,6 @@ async function getHeadshotUrl(userId) {
     return null;
   }
 }
-
 
 async function getUsername(userId) {
   if (usernameCache[userId]) return usernameCache[userId];
@@ -110,6 +109,26 @@ async function setDatastoreEntry(userId, valueObj) {
   }
 }
 
+// New: send message to Roblox Messaging Service
+async function sendMessageToRoblox(userId) {
+  try {
+    const url = `https://apis.roblox.com/messaging-service/v1/universes/${UNIVERSE_ID}/topics/BanWaveAPI`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'x-api-key': ROBLOX_API_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId }),
+    });
+    if (!res.ok) {
+      console.error(`Messaging service error: HTTP ${res.status}`);
+    }
+  } catch (err) {
+    console.error('Messaging service error:', err);
+  }
+}
+
 export async function execute(interaction) {
   if (!allowedRoles.some(role => interaction.member.roles.cache.has(role))) {
     return interaction.reply({ content: "You don't have permission to ban people around here..", ephemeral: true });
@@ -119,10 +138,10 @@ export async function execute(interaction) {
 
   const username = interaction.options.getString('username');
   const robloxId = await getRobloxId(username);
-  if (!robloxId) return interaction.editReply({ content: ` Error occurred while searching really hard for this player's username :  **${username}**.` });
+  if (!robloxId) return interaction.editReply({ content: `Error occurred while searching for this player's username: **${username}**.` });
 
   const displayName = await getUsername(robloxId);
-const headshot = await getHeadshotUrl(robloxId) || null;
+  const headshot = await getHeadshotUrl(robloxId) || null;
 
   const embed = new EmbedBuilder()
     .setTitle('🚨 Ban Player')
@@ -169,8 +188,6 @@ const headshot = await getHeadshotUrl(robloxId) || null;
     confirmCollector.on('collect', async confirmInt => {
       if (confirmInt.user.id !== interaction.user.id) return confirmInt.reply({ content: 'Only the command user can respond.', ephemeral: true });
 
-
-
       if (confirmInt.customId === 'cancel') {
         await confirmInt.update({ embeds: [new EmbedBuilder().setTitle('❌ Ban Cancelled').setColor(0x808080)], components: [] });
         confirmCollector.stop();
@@ -182,6 +199,8 @@ const headshot = await getHeadshotUrl(robloxId) || null;
 
         try {
           await setDatastoreEntry(robloxId, valueObj);
+          await sendMessageToRoblox(robloxId); // <-- send to messaging service
+
           await confirmInt.update({
             embeds: [
               new EmbedBuilder()
