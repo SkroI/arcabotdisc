@@ -2,7 +2,7 @@ import { EmbedBuilder } from 'discord.js';
 import fetch from 'node-fetch';
 
 const CHANNEL_ID = '1427324210832740415';
-const MESSAGE_ID = '1427327245386780714'; // the leaderboard message
+const MESSAGE_ID = process.env.MESSAGE_ID'; // the leaderboard message
 const usernameCache = {};
 
 async function getUsername(userId) {
@@ -61,18 +61,29 @@ export async function fetchLeaderboardEmbed() {
   }
 }
 
-// Edit the existing message
 export async function editLeaderboardMessage(client) {
   try {
     const embed = await fetchLeaderboardEmbed();
-    if (!embed) return;
+    if (!embed) {
+      console.error('❌ No embed data to send.');
+      return;
+    }
 
     const channel = await client.channels.fetch(CHANNEL_ID);
-    const message = await channel.messages.fetch(MESSAGE_ID);
 
-    await message.edit({ embeds: [embed] });
-    console.log(`✅ Leaderboard message updated`);
+    try {
+      const message = await channel.messages.fetch(MESSAGE_ID);
+      await message.edit({ embeds: [embed] });
+      console.log('✅ Leaderboard message updated');
+    } catch (fetchErr) {
+      console.warn('⚠️ Existing leaderboard message not found, sending a new one...');
+      const sent = await channel.send({ embeds: [embed] });
+      console.log(`✅ Sent new leaderboard message!`);
+      console.log(`👉 Update your .env or code with this new ID.`);
+    }
+
   } catch (err) {
-    console.error('❌ Failed to edit leaderboard message:', err);
+    console.error('❌ Failed to edit/send leaderboard message:', err);
   }
 }
+
