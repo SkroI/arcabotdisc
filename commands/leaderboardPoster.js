@@ -2,7 +2,7 @@ import { EmbedBuilder } from 'discord.js';
 import fetch from 'node-fetch';
 
 const CHANNEL_ID = '1427324210832740415';
-const MESSAGE_ID = process.env.MESSAGE_ID'; // the leaderboard message
+const MESSAGE_ID = process.env.MESSAGE_ID;
 const usernameCache = {};
 
 async function getUsername(userId) {
@@ -86,4 +86,5 @@ export async function editLeaderboardMessage(client) {
     console.error('❌ Failed to edit/send leaderboard message:', err);
   }
 }
+
 
