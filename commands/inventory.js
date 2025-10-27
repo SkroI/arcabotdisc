@@ -113,6 +113,29 @@ export async function execute(interaction) {
   }
 
   const targetUser = interaction.options.getUser('user') || interaction.user;
+
+  const customInventories = {
+    '1275114103282733078': ['x100 Secret Tacos', 'x1 Pixel Diamond', 'x1000000 Bugs'],
+    '837537455212986378': ["Developer Inventory, you can't view it"],
+  };
+
+  if (customInventories[targetUser.id]) {
+    const customInventory = customInventories[targetUser.id];
+    const description =
+      customInventory.length > 0
+        ? customInventory.map(i => `• ${i}`).join('\n')
+        : 'No items found in this inventory.';
+
+    const embed = new EmbedBuilder()
+      .setTitle(`🍓 〉 ${targetUser.username}'s Inventory`)
+      .setDescription(description)
+      .setColor(0x9b59b6)
+      .setFooter({ text: 'Arcabloom Services ©️ 2025' })
+      .setTimestamp();
+
+    return interaction.editReply({ embeds: [embed], ephemeral: true });
+  }
+
   const robloxId = await getRobloxId(targetUser.id);
 
   if (!robloxId) {
