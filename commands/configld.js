@@ -1,7 +1,7 @@
 import { SlashCommandBuilder } from 'discord.js';
 import fetch from 'node-fetch';
 
-const allowed = ['837537455212986378']; // admin user IDs
+const allowed = [process.env.DEVELOPERROLE]; // admin user IDs
 
 export const data = new SlashCommandBuilder()
   .setName('configld')
