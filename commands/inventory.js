@@ -18,9 +18,7 @@ const UNIVERSE_ID = process.env.ROBLOX_UNIVERSE_ID;
 const DATASTORE = process.env.ROBLOX_INVENTORY_KEY;
 const SCOPE = 'global';
 
-const ALLOWED_ROLES = [
-  '1427338616580870247', 
-];
+const ALLOWED_ROLES = [process.env.MODROLE];
 
 const namecache = {};
 const usernameCache = {};
