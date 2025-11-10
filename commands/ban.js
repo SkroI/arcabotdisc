@@ -10,7 +10,7 @@ import crypto from 'crypto';
 import fetch from 'node-fetch';
 
 // CONFIG
-const allowedRoles = ['1427338616580870247'];
+const allowedRoles = [process.env.MODROLE];
 const ROBLOX_API_KEY = process.env.ROBLOX_API_KEY;
 const UNIVERSE_ID = process.env.ROBLOX_UNIVERSE_ID;
 const DATASTORE_NAME = 'Banland';
@@ -228,3 +228,4 @@ export async function execute(interaction) {
     }
   });
 }
+
