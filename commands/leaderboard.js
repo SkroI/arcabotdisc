@@ -2,10 +2,7 @@ import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import fetch from 'node-fetch';
 
 // 🧩 Add allowed role IDs here
-const allowedRoles = [
-  '1427338616580870247', // Admin role
-  // '123456789012345678', // Add more roles here
-];
+const allowedRoles = [];
 
 const usernameCache = {};
 
