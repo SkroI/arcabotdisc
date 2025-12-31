@@ -1,4 +1,11 @@
-import { Client, GatewayIntentBits, Collection, ActivityType, REST, Routes } from 'discord.js';
+import {
+  Client,
+  GatewayIntentBits,
+  Collection,
+  ActivityType,
+  REST,
+  Routes,
+} from 'discord.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -13,7 +20,7 @@ const clientId = process.env.ID;
 const guildId = process.env.GUILD_ID;
 
 if (!token || !clientId || !guildId) {
-  console.error("❌ Missing TOKEN, ID, or GUILD_ID in .env");
+  console.error('❌ Missing TOKEN, ID, or GUILD_ID in .env');
   process.exit(1);
 }
 
@@ -22,15 +29,44 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // --- Discord client setup ---
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.DirectMessages] });
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.DirectMessages,
+  ],
+});
 client.commands = new Collection();
+
+// --- Death countdown helper ---
+function getDeathCountdown() {
+  const now = new Date();
+  const deathDate = new Date();
+  deathDate.setMonth(deathDate.getMonth() + 2);
+
+  const diffMs = deathDate - now;
+
+  if (diffMs <= 0) return '☠️ Death has arrived';
+
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const hours = Math.floor(
+    (diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+  );
+  const minutes = Math.floor(
+    (diffMs % (1000 * 60 * 60)) / (1000 * 60)
+  );
+
+  return `☠️ Death in ${days}d ${hours}h ${minutes}m`;
+}
 
 // --- Load commands dynamically ---
 const commands = [];
 const commandsPath = path.join(__dirname, 'commands');
 
 if (fs.existsSync(commandsPath)) {
-  const commandFiles = fs.readdirSync(commandsPath).filter(f => f.endsWith('.js') && !f.includes('template'));
+  const commandFiles = fs
+    .readdirSync(commandsPath)
+    .filter((f) => f.endsWith('.js') && !f.includes('template'));
 
   for (const file of commandFiles) {
     const modulePath = `file://${path.join(commandsPath, file)}`;
@@ -51,7 +87,10 @@ if (fs.existsSync(commandsPath)) {
 const rest = new REST({ version: '10' }).setToken(token);
 try {
   console.log(`🔄 Refreshing ${commands.length} application commands...`);
-  await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body: commands });
+  await rest.put(
+    Routes.applicationGuildCommands(clientId, guildId),
+    { body: commands }
+  );
   console.log('✅ Commands registered successfully.');
 } catch (err) {
   console.error('❌ Error registering commands:', err);
@@ -75,10 +114,12 @@ app.get('/', async (_req, res) => {
   }
 });
 
-app.listen(PORT, () => console.log(`🌐 Express server running on port ${PORT}`));
+app.listen(PORT, () =>
+  console.log(`🌐 Express server running on port ${PORT}`)
+);
 
 // --- Discord interaction handling ---
-client.on('interactionCreate', async interaction => {
+client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
   const command = client.commands.get(interaction.commandName);
@@ -91,9 +132,15 @@ client.on('interactionCreate', async interaction => {
 
     try {
       if (!interaction.deferred && !interaction.replied) {
-        await interaction.reply({ content: '⚠️ Something went wrong.', ephemeral: true });
+        await interaction.reply({
+          content: '⚠️ Something went wrong.',
+          ephemeral: true,
+        });
       } else {
-        await interaction.followUp({ content: '⚠️ Something went wrong.', ephemeral: true });
+        await interaction.followUp({
+          content: '⚠️ Something went wrong.',
+          ephemeral: true,
+        });
       }
     } catch (error) {
       if (error.code !== 10062 && error.code !== 40060) {
@@ -106,7 +153,31 @@ client.on('interactionCreate', async interaction => {
 // --- Ready event ---
 client.once('ready', async () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
-  client.user.setActivity('Arcabloom Services', { type: ActivityType.Playing });
+
+  client.user.setActivity('Arcabloom Services', {
+    type: ActivityType.Playing,
+  });
+
+  let lastBio = '';
+
+  const updateBio = async () => {
+    try {
+      const countdown = getDeathCountdown();
+      if (countdown === lastBio) return;
+
+      lastBio = countdown;
+      await client.user.setAboutMe(countdown);
+      console.log('🩸 About Me updated:', countdown);
+    } catch (err) {
+      console.error('❌ Failed to update About Me:', err);
+    }
+  };
+
+  // Initial update
+  await updateBio();
+
+  // Update every minute
+  setInterval(updateBio, 1000 * 60);
 });
 
 // --- Login ---
