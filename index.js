@@ -18,6 +18,7 @@ config(); // Load .env
 const token = process.env.TOKEN;
 const clientId = process.env.ID;
 const guildId = process.env.GUILD_ID;
+const deathMessageId = process.env.DEATH_ID;
 
 if (!token || !clientId || !guildId) {
   console.error('❌ Missing TOKEN, ID, or GUILD_ID in .env');
@@ -39,24 +40,39 @@ const client = new Client({
 client.commands = new Collection();
 
 // --- Death countdown helper ---
-function getDeathCountdown() {
+function getDeathMessage() {
   const now = new Date();
-  const deathDate = new Date();
-  deathDate.setMonth(deathDate.getMonth() + 2);
 
-  const diffMs = deathDate - now;
+  // Fixed death date: 2 months from 31/12/2025
+  const deathDate = new Date('2026-02-28T00:00:00Z');
 
-  if (diffMs <= 0) return '☠️ Death has arrived';
+  if (now >= deathDate) {
+    return '☠️ I am dead.\n🪦 Dead time: 28/02/2026';
+  }
+
+  let months =
+    (deathDate.getUTCFullYear() - now.getUTCFullYear()) * 12 +
+    (deathDate.getUTCMonth() - now.getUTCMonth());
+
+  const tempDate = new Date(now);
+  tempDate.setUTCMonth(tempDate.getUTCMonth() + months);
+
+  if (tempDate > deathDate) {
+    months--;
+    tempDate.setUTCMonth(tempDate.getUTCMonth() - 1);
+  }
+
+  const diffMs = deathDate - tempDate;
 
   const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  const hours = Math.floor(
-    (diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
-  );
   const minutes = Math.floor(
-    (diffMs % (1000 * 60 * 60)) / (1000 * 60)
+    (diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60)
   );
 
-  return `☠️ Death in ${days}d ${hours}h ${minutes}m`;
+  return (
+    `☠️ I'll die in: ${months} months ${days} days ${minutes} minutes\n` +
+    `🪦 Dead time: 28/02/2026`
+  );
 }
 
 // --- Load commands dynamically ---
@@ -77,78 +93,23 @@ if (fs.existsSync(commandsPath)) {
       client.commands.set(command.data.name, command);
       commands.push(command.data.toJSON());
       console.log(`✅ Loaded command: ${command.data.name}`);
-    } else {
-      console.log(`⚠️ Skipped ${file}: missing 'data' or 'execute'`);
     }
   }
 }
 
 // --- Register slash commands ---
 const rest = new REST({ version: '10' }).setToken(token);
-try {
-  console.log(`🔄 Refreshing ${commands.length} application commands...`);
-  await rest.put(
-    Routes.applicationGuildCommands(clientId, guildId),
-    { body: commands }
-  );
-  console.log('✅ Commands registered successfully.');
-} catch (err) {
-  console.error('❌ Error registering commands:', err);
-}
+await rest.put(Routes.applicationGuildCommands(clientId, guildId), {
+  body: commands,
+});
 
 // --- Express server ---
 const app = express();
-const PORT = process.env.PORT || 4000;
-
 app.get('/', async (_req, res) => {
-  try {
-    await editLeaderboardMessage(client);
-    res.send(`
-      <h1>🍓 Arcabloom Services are online!</h1>
-      <p><strong>Bot:</strong> ${client.user?.tag ?? 'Starting...'}</p>
-      <p><strong>Leaderboard updated!</strong></p>
-    `);
-  } catch (err) {
-    console.error('❌ Error updating leaderboard via Express route:', err);
-    res.status(500).send('❌ Failed to update leaderboard.');
-  }
+  await editLeaderboardMessage(client);
+  res.send('Arcabloom Services online');
 });
-
-app.listen(PORT, () =>
-  console.log(`🌐 Express server running on port ${PORT}`)
-);
-
-// --- Discord interaction handling ---
-client.on('interactionCreate', async (interaction) => {
-  if (!interaction.isChatInputCommand()) return;
-
-  const command = client.commands.get(interaction.commandName);
-  if (!command) return;
-
-  try {
-    await command.execute(interaction);
-  } catch (err) {
-    console.error(`❌ Error running /${interaction.commandName}:`, err);
-
-    try {
-      if (!interaction.deferred && !interaction.replied) {
-        await interaction.reply({
-          content: '⚠️ Something went wrong.',
-          ephemeral: true,
-        });
-      } else {
-        await interaction.followUp({
-          content: '⚠️ Something went wrong.',
-          ephemeral: true,
-        });
-      }
-    } catch (error) {
-      if (error.code !== 10062 && error.code !== 40060) {
-        console.error('⚠️ Failed to send error message:', error);
-      }
-    }
-  }
-});
+app.listen(process.env.PORT || 4000);
 
 // --- Ready event ---
 client.once('ready', async () => {
@@ -158,26 +119,37 @@ client.once('ready', async () => {
     type: ActivityType.Playing,
   });
 
-  let lastBio = '';
+  const channelId = '1455903567419543714';
+  let message;
 
-  const updateBio = async () => {
+  const channel = await client.channels.fetch(channelId);
+  if (!channel || !channel.isTextBased()) return;
+
+  // If no message ID → send new message
+  if (!deathMessageId || deathMessageId === 'PUT_MESSAGE_ID_HERE') {
+    message = await channel.send(getDeathMessage());
+    console.log('🆕 Death message sent');
+    console.log('🧾 MESSAGE ID:', message.id);
+    console.log('➡️ Put this in .env as DEATH_ID');
+  } else {
+    // Otherwise fetch existing message
+    message = await channel.messages.fetch(deathMessageId);
+    console.log('✏️ Updating existing death message');
+  }
+
+  const updateMessage = async () => {
     try {
-      const countdown = getDeathCountdown();
-      if (countdown === lastBio) return;
-
-      lastBio = countdown;
-      await client.user.setAboutMe(countdown);
-      console.log('🩸 About Me updated:', countdown);
+      await message.edit(getDeathMessage());
     } catch (err) {
-      console.error('❌ Failed to update About Me:', err);
+      console.error('❌ Failed to update death message:', err);
     }
   };
 
   // Initial update
-  await updateBio();
+  await updateMessage();
 
   // Update every minute
-  setInterval(updateBio, 1000 * 60);
+  setInterval(updateMessage, 1000 * 60);
 });
 
 // --- Login ---
