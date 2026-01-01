@@ -18,7 +18,7 @@ const ROBLOX_API_KEY = process.env.ROBLOX_API_KEY;
 const GUILD_ID = process.env.GUILD_ID;
 const UNIVERSE_ID = process.env.ROBLOX_UNIVERSE_ID;
 const DATASTORE_NAME = 'VerificationDB';
-const ALLOWED_ROLES = [process.env.MODROLE];
+const ALLOWED_ROLES = process.env.MODROLE;
 
 const usernameCache = {};
 
