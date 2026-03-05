@@ -152,7 +152,7 @@ export async function execute(interaction) {
   const description =
     stacked.length > 0
       ? stacked.map(i => `• ${i}`).join('\n')
-      : 'No items found in your inventory.';
+      : 'No items found in inventory.';
 
   const embed = new EmbedBuilder()
     .setTitle(`🍓 〉 ${username}'s Inventory`)
