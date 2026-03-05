@@ -13,8 +13,9 @@ import { config } from 'dotenv';
 import express from 'express';
 import { editLeaderboardMessage } from './commands/leaderboardPoster.js';
 
-config(); // Load .env
+config();
 
+// --- ENV ---
 const token = process.env.TOKEN;
 const clientId = process.env.ID;
 const guildId = process.env.GUILD_ID;
@@ -29,7 +30,7 @@ if (!token || !clientId || !guildId) {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// --- Discord client setup ---
+// --- Discord client ---
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -37,9 +38,8 @@ const client = new Client({
     GatewayIntentBits.DirectMessages,
   ],
 });
+
 client.commands = new Collection();
-
-
 
 // --- Load commands dynamically ---
 const commands = [];
@@ -65,17 +65,28 @@ if (fs.existsSync(commandsPath)) {
 
 // --- Register slash commands ---
 const rest = new REST({ version: '10' }).setToken(token);
-await rest.put(Routes.applicationGuildCommands(clientId, guildId), {
-  body: commands,
-});
+
+await rest.put(
+  Routes.applicationGuildCommands(clientId, guildId),
+  { body: commands }
+);
 
 // --- Express server ---
 const app = express();
+
 app.get('/', async (_req, res) => {
-  await editLeaderboardMessage(client);
-  res.send('Arcabloom Services online');
+  try {
+    await editLeaderboardMessage(client);
+    res.send('Arcabloom Services online');
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Error updating leaderboard');
+  }
 });
-app.listen(process.env.PORT || 4000);
+
+app.listen(process.env.PORT || 4000, () => {
+  console.log('🌐 Web server running');
+});
 
 // --- Ready event ---
 client.once('ready', async () => {
@@ -86,12 +97,17 @@ client.once('ready', async () => {
   });
 
   const channelId = '1455903567419543714';
-  let message;
 
-  const channel = await client.channels.fetch(channelId);
-  if (!channel || !channel.isTextBased()) return;
+  try {
+    const channel = await client.channels.fetch(channelId);
 
- 
+    if (!channel || !channel.isTextBased()) return;
+
+    console.log('📡 Channel fetched successfully');
+  } catch (err) {
+    console.error('❌ Failed to fetch channel:', err);
+  }
+});
 
 // --- Login ---
 client.login(token);
