@@ -19,7 +19,6 @@ config();
 const token = process.env.TOKEN;
 const clientId = process.env.ID;
 const guildId = process.env.GUILD_ID;
-const deathMessageId = process.env.DEATH_ID;
 
 if (!token || !clientId || !guildId) {
   console.error('❌ Missing TOKEN, ID, or GUILD_ID in .env');
@@ -41,7 +40,7 @@ const client = new Client({
 
 client.commands = new Collection();
 
-// --- Load commands dynamically ---
+// --- Load commands ---
 const commands = [];
 const commandsPath = path.join(__dirname, 'commands');
 
@@ -53,13 +52,19 @@ if (fs.existsSync(commandsPath)) {
   for (const file of commandFiles) {
     const modulePath = `file://${path.join(commandsPath, file)}`;
     const mod = await import(modulePath);
-    const command = mod.default ?? mod;
 
-    if (command?.data && command?.execute) {
-      client.commands.set(command.data.name, command);
-      commands.push(command.data.toJSON());
-      console.log(`✅ Loaded command: ${command.data.name}`);
+    // support both default export and named export
+    const command = mod.default || mod;
+
+    if (!command.data || !command.execute) {
+      console.log(`⚠️ Skipping ${file} (missing data or execute)`);
+      continue;
     }
+
+    client.commands.set(command.data.name, command);
+    commands.push(command.data.toJSON());
+
+    console.log(`✅ Loaded command: ${command.data.name}`);
   }
 }
 
@@ -71,16 +76,48 @@ await rest.put(
   { body: commands }
 );
 
+console.log('✅ Slash commands registered');
+
+// --- Interaction handler ---
+client.on('interactionCreate', async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+
+  const command = client.commands.get(interaction.commandName);
+  if (!command) return;
+
+  try {
+    await command.execute(interaction, client);
+  } catch (error) {
+    console.error(`❌ Error executing ${interaction.commandName}:`, error);
+
+    if (interaction.replied || interaction.deferred) {
+      await interaction.followUp({
+        content: '❌ There was an error executing this command.',
+        ephemeral: true,
+      });
+    } else {
+      await interaction.reply({
+        content: '❌ There was an error executing this command.',
+        ephemeral: true,
+      });
+    }
+  }
+});
+
 // --- Express server ---
 const app = express();
 
 app.get('/', async (_req, res) => {
+  if (!client.isReady()) {
+    return res.send('Bot not ready yet');
+  }
+
   try {
     await editLeaderboardMessage(client);
     res.send('Arcabloom Services online');
   } catch (err) {
     console.error(err);
-    res.status(500).send('Error updating leaderboard');
+    res.status(500).send('Leaderboard update error');
   }
 });
 
