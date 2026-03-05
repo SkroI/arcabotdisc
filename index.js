@@ -39,41 +39,7 @@ const client = new Client({
 });
 client.commands = new Collection();
 
-// --- Death countdown helper ---
-function getDeathMessage() {
-  const now = new Date();
 
-  // Fixed death date: 2 months from 31/12/2025
-  const deathDate = new Date('2026-02-28T00:00:00Z');
-
-  if (now >= deathDate) {
-    return '☠️ I am dead.\n🪦 Dead time: 28/02/2026';
-  }
-
-  let months =
-    (deathDate.getUTCFullYear() - now.getUTCFullYear()) * 12 +
-    (deathDate.getUTCMonth() - now.getUTCMonth());
-
-  const tempDate = new Date(now);
-  tempDate.setUTCMonth(tempDate.getUTCMonth() + months);
-
-  if (tempDate > deathDate) {
-    months--;
-    tempDate.setUTCMonth(tempDate.getUTCMonth() - 1);
-  }
-
-  const diffMs = deathDate - tempDate;
-
-  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  const minutes = Math.floor(
-    (diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60)
-  );
-
-  return (
-    `☠️ I'll die in: ${months} months ${days} days ${minutes} minutes\n` +
-    `🪦 Dead time: 28/02/2026`
-  );
-}
 
 // --- Load commands dynamically ---
 const commands = [];
@@ -125,32 +91,7 @@ client.once('ready', async () => {
   const channel = await client.channels.fetch(channelId);
   if (!channel || !channel.isTextBased()) return;
 
-  // If no message ID → send new message
-  if (!deathMessageId || deathMessageId === 'PUT_MESSAGE_ID_HERE') {
-    message = await channel.send(getDeathMessage());
-    console.log('🆕 Death message sent');
-    console.log('🧾 MESSAGE ID:', message.id);
-    console.log('➡️ Put this in .env as DEATH_ID');
-  } else {
-    // Otherwise fetch existing message
-    message = await channel.messages.fetch(deathMessageId);
-    console.log('✏️ Updating existing death message');
-  }
-
-  const updateMessage = async () => {
-    try {
-      await message.edit(getDeathMessage());
-    } catch (err) {
-      console.error('❌ Failed to update death message:', err);
-    }
-  };
-
-  // Initial update
-  await updateMessage();
-
-  // Update every minute
-  setInterval(updateMessage, 1000 * 60);
-});
+ 
 
 // --- Login ---
 client.login(token);
