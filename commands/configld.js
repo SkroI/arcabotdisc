@@ -55,9 +55,15 @@ async function incrementCoins(userId, amount, universeId, dataStore, scope, apiK
 }
 
 export async function execute(interaction) {
-  if (allowed.length > 0 && !allowed.includes(interaction.user.id)) {
-    return interaction.reply({ content: '❌ You do not have permission.', ephemeral: true });
-  }
+  if (
+  !interaction.member.roles.cache.some(role => allowed.includes(role.id)) && // no allowed role
+  !allowed.includes(interaction.user.id) // and not an allowed user
+) {
+  return interaction.reply({
+    content: '❌ You do not have permission.',
+    ephemeral: true
+  });
+}
 
   const username = interaction.options.getString('username');
   const amount = interaction.options.getInteger('amount');
