@@ -1,9 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import fetch from 'node-fetch';
 
-// 🧩 Add allowed role IDs here
-const allowedRoles = [];
-
 const usernameCache = {};
 
 async function getUsername(userId) {
@@ -26,18 +23,7 @@ export const data = new SlashCommandBuilder()
   .setDMPermission(false);
 
 export async function execute(interaction) {
-  // ✅ Check if user has any of the allowed roles
-  const hasAccess = allowedRoles.some(roleId =>
-    interaction.member.roles.cache.has(roleId)
-  );
-
-  if (!hasAccess) {
-    return interaction.reply({
-      content: '🚫 You do not have permission to use this command.',
-      ephemeral: true,
-    });
-  }
-
+  
   const universeId = process.env.ROBLOX_UNIVERSE_ID;
   const dataStore = process.env.ROBLOX_LEADERSTAT_KEY;
   const scope = 'global';
