@@ -222,10 +222,11 @@ export async function execute(interaction) {
   collector.on('end', (_, reason) => {
     if (reason === 'time') {
       interaction.editReply({
-        embeds: [new EmbedBuilder().setTitle('Oops run out of time..').setDescription('Please try again').setColor(0x808080)],
+        embeds: [new EmbedBuilder().setTitle('Oops run out of time..').setDescription('Please try again').setColor(0x808080).setFooter({ text: 'Arcabloom Services ©️ 2026' })],
         components: []
       }).catch(() => {});
     }
   });
 }
+
 
