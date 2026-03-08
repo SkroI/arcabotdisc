@@ -68,6 +68,7 @@ export async function execute(interaction) {
       .setDescription(leaderboardLines.join('\n'))
       .setColor(0xFFD700)
       .setThumbnail('https://tr.rbxcdn.com/1e1c7f41bb5f41c0d87a2a4f1d8898d2/420/420/Image/Png')
+      .setFooter({ text: 'Arcabloom Services ©️ 2026' })
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed] });
