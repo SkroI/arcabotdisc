@@ -128,7 +128,7 @@ export async function execute(interaction) {
       .setTitle(`🍓 〉 ${targetUser.username}'s Inventory`)
       .setDescription(description)
       .setColor(0x9b59b6)
-      .setFooter({ text: 'Arcabloom Services ©️ 2025' })
+      .setFooter({ text: 'Arcabloom Services ©️ 2026' })
       .setTimestamp();
 
     return interaction.editReply({ embeds: [embed], ephemeral: true });
