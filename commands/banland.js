@@ -100,7 +100,7 @@ export async function execute(interaction) {
       .setTitle('🚫 Banlist')
       .setDescription(lines.join('\n\n') || 'No banned players.')
       .setColor(0xff0000)
-      .setTimestamp();
+      .setFooter({ text: 'Arcabloom Services ©️ 2026' });
 
     await interaction.editReply({ embeds: [embed] });
 
