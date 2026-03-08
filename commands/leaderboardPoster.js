@@ -51,7 +51,7 @@ export async function fetchLeaderboardEmbed() {
       .setDescription(leaderboardLines.join('\n'))
       .setColor(0xFFD700)
       .setThumbnail('https://tr.rbxcdn.com/1e1c7f41bb5f41c0d87a2a4f1d8898d2/420/420/Image/Png')
-      .setFooter({ text: 'Last updated' })
+      .setFooter({ text: 'Arcabloom Services ©️ 2026 // Last updated' })
       .setTimestamp();
 
     return embed;
@@ -86,5 +86,6 @@ export async function editLeaderboardMessage(client) {
     console.error('❌ Failed to edit/send leaderboard message:', err);
   }
 }
+
 
 
