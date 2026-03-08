@@ -118,6 +118,7 @@ export async function execute(interaction) {
     .setTitle('🚨 Unban Player')
     .setDescription(`Are you sure you want to unban **${displayName}** (${robloxId})?`)
     .setThumbnail(headshot)
+    .setFooter({ text: 'Arcabloom Services ©️ 2026' })
     .setColor(0x00aaff);
 
   const buttonsRow = new ActionRowBuilder().addComponents(
@@ -179,4 +180,5 @@ export async function execute(interaction) {
     }
   });
 }
+
 
