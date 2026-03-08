@@ -111,10 +111,11 @@ export async function execute(interaction) {
 
     )
     .setColor(0xFFD700)
-    .setFooter({ text: 'Arcabloom Services ©️ 2025' })
+    .setFooter({ text: 'Arcabloom Services ©️ 2026' })
     .setTimestamp();
 
   await interaction.reply({ embeds: [embed], ephemeral: true });
 }
+
 
 
